@@ -33,6 +33,22 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Serve custom alarm audio securely
+app.get('/api/audio/alarm', (req, res) => {
+  const dest = req.headers['sec-fetch-dest'];
+  // Prevent direct browser URL access
+  if (dest === 'document') {
+    return res.status(403).json({ error: 'Direct access forbidden' });
+  }
+
+  const audioPath = path.join(__dirname, '../sounds', 'alarm.mp3');
+  res.sendFile(audioPath, (err) => {
+    if (err) {
+      res.status(404).end();
+    }
+  });
+});
+
 // Serve frontend static files in production
 if (process.env.NODE_ENV === 'production') {
   const clientDistPath = path.join(__dirname, '../../client/dist');

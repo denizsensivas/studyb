@@ -28,6 +28,7 @@ export function useTimer(onComplete?: (mode: string, durationMinutes: number, co
   const [consumedSeconds, setConsumedSeconds] = useState(0);
   
   const timerRef = useRef<number | null>(null);
+  const skipRef = useRef(false);
 
   useEffect(() => {
     // Load persisted state if any
@@ -63,11 +64,16 @@ export function useTimer(onComplete?: (mode: string, durationMinutes: number, co
       setIsRunning(false);
       if (timerRef.current) clearInterval(timerRef.current);
       
-      // Play sound
-      try {
-        const audio = new Audio('/bell.mp3');
-        audio.play().catch(() => {});
-      } catch (e) {}
+      const wasSkipped = skipRef.current;
+      skipRef.current = false;
+
+      // Play sound only if not skipped
+      if (!wasSkipped) {
+        try {
+          const audio = new Audio('/api/audio/alarm');
+          audio.play().catch(() => {});
+        } catch (e) {}
+      }
 
       // Call completion handler
       if (onComplete) {
@@ -117,6 +123,7 @@ export function useTimer(onComplete?: (mode: string, durationMinutes: number, co
   };
 
   const skip = () => {
+    skipRef.current = true;
     setTimeLeft(0);
     if (!isRunning) setIsRunning(true); // force trigger completion inside useEffect
   };
