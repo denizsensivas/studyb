@@ -29,8 +29,28 @@ export function useTimer(onComplete?: (mode: string, durationMinutes: number, co
   
   const timerRef = useRef<number | null>(null);
   const skipRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const lastTickRef = useRef<number>(Date.now());
+  const workerRef = useRef<Worker | null>(null);
 
   useEffect(() => {
+    // Setup Web Worker for unthrottled background tick
+    const workerCode = `
+      let intervalId = null;
+      self.onmessage = function(e) {
+        if (e.data === 'start') {
+          if (!intervalId) {
+            intervalId = setInterval(() => self.postMessage('tick'), 500);
+          }
+        } else if (e.data === 'stop') {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+      };
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    workerRef.current = new Worker(URL.createObjectURL(blob));
+
     // Load persisted state if any
     const saved = localStorage.getItem('studyb_timer');
     if (saved) {
@@ -46,8 +66,42 @@ export function useTimer(onComplete?: (mode: string, durationMinutes: number, co
         // ignore parsing errors
       }
     }
+
+    return () => {
+      workerRef.current?.terminate();
+    };
   }, []);
 
+  // Tick logic independent of state changes to avoid drift and background tab throttling issues
+  useEffect(() => {
+    if (isRunning && workerRef.current) {
+      lastTickRef.current = Date.now();
+      
+      workerRef.current.onmessage = () => {
+        const now = Date.now();
+        const deltaSeconds = Math.floor((now - lastTickRef.current) / 1000);
+        
+        if (deltaSeconds > 0) {
+          lastTickRef.current += deltaSeconds * 1000;
+          setTimeLeft((prev) => {
+            const next = prev - deltaSeconds;
+            return next > 0 ? next : 0;
+          });
+          setConsumedSeconds((prev) => prev + deltaSeconds);
+        }
+      };
+
+      workerRef.current.postMessage('start');
+    }
+
+    return () => {
+      if (workerRef.current) {
+        workerRef.current.postMessage('stop');
+      }
+    };
+  }, [isRunning]);
+
+  // Persistence and Completion logic
   useEffect(() => {
     // Persist state on change
     localStorage.setItem(
@@ -55,12 +109,7 @@ export function useTimer(onComplete?: (mode: string, durationMinutes: number, co
       JSON.stringify({ mode, timeLeft, customDurations, consumedSeconds })
     );
 
-    if (isRunning && timeLeft > 0) {
-      timerRef.current = window.setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-        setConsumedSeconds((prev) => prev + 1);
-      }, 1000);
-    } else if (timeLeft === 0 && isRunning) {
+    if (timeLeft === 0 && isRunning) {
       setIsRunning(false);
       if (timerRef.current) clearInterval(timerRef.current);
       
@@ -69,10 +118,15 @@ export function useTimer(onComplete?: (mode: string, durationMinutes: number, co
 
       // Play sound only if not skipped
       if (!wasSkipped) {
-        try {
-          const audio = new Audio('/api/audio/alarm');
-          audio.play().catch(() => {});
-        } catch (e) {}
+        if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play().catch(e => console.error("Audio play failed:", e));
+        } else {
+          try {
+            const audio = new Audio('/api/audio/alarm');
+            audio.play().catch(e => console.error("Audio play failed fallback:", e));
+          } catch (e) {}
+        }
       }
 
       // Call completion handler
@@ -84,13 +138,31 @@ export function useTimer(onComplete?: (mode: string, durationMinutes: number, co
       }
       setConsumedSeconds(0);
     }
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
   }, [isRunning, timeLeft, mode, customDurations, onComplete, consumedSeconds]);
 
-  const start = () => setIsRunning(true);
+  const initAudioUnlock = () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio('/api/audio/alarm');
+    }
+    // Attempt play/pause sequentially to unlock audio context without making noise
+    const playPromise = audioRef.current.play();
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        audioRef.current?.pause();
+        if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+        }
+      }).catch(() => {
+        // Expected if already playing or no interaction yet
+      });
+    }
+  };
+
+  const start = () => {
+    initAudioUnlock();
+    setIsRunning(true);
+  };
+
   const pause = () => setIsRunning(false);
   
   const reset = () => {

@@ -29,6 +29,9 @@ RUN cd server && npm install --omit=dev && npx prisma generate
 COPY --from=server-builder /app/server/dist ./server/dist
 COPY --from=client-builder /app/client/dist ./client/dist
 
+# Copy static backend assets
+COPY server/sounds ./server/sounds
+
 # Set environment variables
 ENV NODE_ENV=production
 
