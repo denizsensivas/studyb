@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EducationLevel {
+  PRIMARY_SCHOOL
+  HIGH_SCHOOL
+  UNIVERSITY
+}
+
+model User {
+  id             String         @id @default(uuid())
+  name           String
+  email          String         @unique
+  password       String
+  educationLevel EducationLevel
+  streak         Int            @default(0)
+  lastActiveDate DateTime?
+  totalQuestions Int            @default(0)
+  totalStudyMinutes Int          @default(0)
+  preferences    Json?          @default("{}")
+  createdAt      DateTime       @default(now())
+
+  subjects     Subject[]
+  dailyEntries DailyEntry[]
+  pomodoros    PomodoroSession[]
+  examSessions ExamSession[]
+}
+
+model Subject {
+  id        String   @id @default(uuid())
+  name      String
+  userId    String
+  createdAt DateTime @default(now())
+
+  user      User              @relation(fields: [userId], references: [id])
+  entries   DailyEntry[]
+  pomodoros PomodoroSession[]
+
+  @@unique([name, userId])
+}
+
+model DailyEntry {
+  id        String   @id @default(uuid())
+  userId    String
+  subjectId String
+  date      DateTime
+  correct   Int
+  wrong     Int
+
+  user    User    @relation(fields: [userId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+}
+
+model PomodoroSession {
+  id          String   @id @default(uuid())
+  userId      String
+  subjectId   String?
+  duration    Int
+  completedAt DateTime
+
+  user    User     @relation(fields: [userId], references: [id])
+  subject Subject? @relation(fields: [subjectId], references: [id])
+}
+
+model ExamSession {
+  id            String   @id @default(uuid())
+  userId        String
+  totalDuration Int
+  createdAt     DateTime @default(now())
+
+  user      User           @relation(fields: [userId], references: [id])
+  questions QuestionTime[]
+}
+
+model QuestionTime {
+  id            String @id @default(uuid())
+  examSessionId String
+  questionNo    Int
+  timeSpent     Int
+
+  examSession ExamSession @relation(fields: [examSessionId], references: [id])
+}

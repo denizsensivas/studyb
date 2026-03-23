@@ -1,0 +1,32 @@
+# Study Buddy (studyb) - Start & Stop Services
+
+## 🛠️ Geliştirme Modu (Development)
+Frontend ve Backend'i ayrı ayrı çalıştırıp anlık değişiklikleri takip etmek için:
+
+1. **Veritabanı (Docker)**: `docker compose up -d`
+2. **Backend**: `cd server && npm run dev` (Port: 3001)
+3. **Frontend**: `cd client && npm run dev` (Port: 5173)
+
+---
+
+## 🚀 Üretim / Canlı Modu (Production - Unified)
+Uygulamayı en hızlı ve tek bir parça halinde çalıştırmak için (Railway/Canlı ortam simülasyonu):
+
+1. **Build (Derleme)**: `cd client && npm run build && cd ../server && npm run build`
+2. **Başlat**: `PORT=8080 node server/dist/index.js`
+   *(Artık sadece http://localhost:8080 üzerinden tüm uygulamaya erişebilirsin)*
+
+**Docker ile Canlıya Almak için:**
+`docker compose -f docker-compose.prod.yml up --build -d`
+
+---
+
+## 🛑 Durdurma (Stop)
+- **Manuel**: Terminalde **Ctrl+C**.
+- **Port Meşgulse**: `kill $(lsof -t -i:8080)` veya `kill $(lsof -t -i:3005)`
+- **Veritabanı**: `docker compose down`
+
+---
+
+## 🧹 Veri Sıfırlama (Reset)
+`docker compose down -v && docker compose up -d`
