@@ -20,6 +20,7 @@ const loginSchema = z.object({
 
 router.post('/register', validate(registerSchema), (req, res) => authController.register(req, res));
 router.post('/login', validate(loginSchema), (req, res) => authController.login(req, res));
+router.post('/test-login', (req, res) => authController.testLogin(req, res));
 router.get('/profile', authMiddleware, (req, res) => authController.getProfile(req, res));
 router.patch('/preferences', authMiddleware, (req, res) => authController.updatePreferences(req, res));
 

@@ -22,6 +22,15 @@ export class AuthController {
     }
   }
 
+  async testLogin(req: Request, res: Response): Promise<void> {
+    try {
+      const result = await authService.testLogin();
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
   async getProfile(req: AuthRequest, res: Response): Promise<void> {
     try {
       const user = await authService.getProfile(req.userId!);

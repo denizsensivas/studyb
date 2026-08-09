@@ -11,6 +11,7 @@ import DailyTrackingPage from './pages/DailyTrackingPage';
 import ExamTimerPage from './pages/ExamTimerPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import LeaderboardPage from './pages/LeaderboardPage';
+import NotesPage from './pages/NotesPage';
 
 export default function App() {
   return (
@@ -67,6 +68,14 @@ export default function App() {
           element={
             <PrivateRoute>
               <LeaderboardPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/notes"
+          element={
+            <PrivateRoute>
+              <NotesPage />
             </PrivateRoute>
           }
         />

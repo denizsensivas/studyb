@@ -26,10 +26,12 @@ model User {
   preferences    Json?          @default("{}")
   createdAt      DateTime       @default(now())
 
-  subjects     Subject[]
-  dailyEntries DailyEntry[]
-  pomodoros    PomodoroSession[]
-  examSessions ExamSession[]
+  subjects      Subject[]
+  dailyEntries  DailyEntry[]
+  pomodoros     PomodoroSession[]
+  examSessions  ExamSession[]
+  documents     Document[]
+  studySessions StudySession[]
 }
 
 model Subject {
@@ -38,9 +40,10 @@ model Subject {
   userId    String
   createdAt DateTime @default(now())
 
-  user      User              @relation(fields: [userId], references: [id])
-  entries   DailyEntry[]
-  pomodoros PomodoroSession[]
+  user           User              @relation(fields: [userId], references: [id])
+  entries        DailyEntry[]
+  pomodoros      PomodoroSession[]
+  studySessions  StudySession[]
 
   @@unique([name, userId])
 }
@@ -85,4 +88,30 @@ model QuestionTime {
   timeSpent     Int
 
   examSession ExamSession @relation(fields: [examSessionId], references: [id])
+}
+
+model Document {
+  id          String   @id @default(uuid())
+  userId      String
+  title       String
+  fileName    String
+  fileSize    Int
+  mimeType    String
+  filePath    String
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model StudySession {
+  id        String   @id @default(uuid())
+  userId    String
+  subjectId String
+  date      DateTime
+  duration  Int      // in minutes
+  notes     String?
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
 }

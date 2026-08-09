@@ -35,6 +35,8 @@ export const authAPI = {
     api.post('/auth/register', data),
   login: (data: { email: string; password: string }) =>
     api.post('/auth/login', data),
+  testLogin: () =>
+    api.post('/auth/test-login'),
   getProfile: () =>
     api.get('/auth/profile'),
   updatePreferences: (preferences: any) =>
@@ -83,4 +85,30 @@ export const leaderboardAPI = {
   getByLevel: (level: string, sortBy?: string) => api.get(`/leaderboard/level/${level}`, { params: { sortBy } }),
 };
 
+// ── Documents ──
+export const documentAPI = {
+  getAll: () => api.get('/documents'),
+  upload: (file: File, title?: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (title) formData.append('title', title);
+    return api.post('/documents/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  download: (id: string) => api.get(`/documents/${id}/download`, { responseType: 'blob' }),
+  delete: (id: string) => api.delete(`/documents/${id}`),
+};
+
+// ── Study Sessions ──
+export const studySessionAPI = {
+  create: (data: { subjectId?: string; subjectName?: string; duration: number; notes?: string }) =>
+    api.post('/study-sessions', data),
+  getAll: () => api.get('/study-sessions'),
+  getToday: () => api.get('/study-sessions/today'),
+};
+
 export default api;
+

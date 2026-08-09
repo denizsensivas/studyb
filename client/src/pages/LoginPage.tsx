@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, testLogin } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,6 +24,20 @@ export default function LoginPage() {
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTestLogin = async () => {
+    setError('');
+    setIsLoading(true);
+
+    try {
+      await testLogin();
+      navigate('/');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Test moduna giriş yapılamadı.');
     } finally {
       setIsLoading(false);
     }
@@ -72,6 +86,16 @@ export default function LoginPage() {
 
             <Button type="submit" fullWidth disabled={isLoading}>
               {isLoading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              fullWidth
+              disabled={isLoading}
+              onClick={handleTestLogin}
+            >
+              🚀 Test Modu ile Giriş Yap
             </Button>
 
             <p className="text-center text-sm font-bold text-clay-muted">

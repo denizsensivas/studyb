@@ -56,6 +56,26 @@ export class AuthService {
     return { user: userWithoutPassword, token };
   }
 
+  async testLogin() {
+    const testEmail = 'testuser@studyb.com';
+    let user = await prisma.user.findUnique({ where: { email: testEmail } });
+    if (!user) {
+      const hashedPassword = await bcrypt.hash('testpassword123', 12);
+      user = await prisma.user.create({
+        data: {
+          name: 'Test Kullanıcısı',
+          email: testEmail,
+          password: hashedPassword,
+          educationLevel: 'UNIVERSITY',
+        },
+      });
+    }
+
+    const token = this.generateToken(user.id);
+    const { password: _, ...userWithoutPassword } = user;
+    return { user: userWithoutPassword, token };
+  }
+
   async getProfile(userId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },

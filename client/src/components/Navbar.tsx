@@ -13,6 +13,7 @@ export default function Navbar() {
     { name: 'Pomodoro', path: '/pomodoro' },
     { name: 'Soru Gir', path: '/tracking' },
     { name: 'Sınav', path: '/exam' },
+    { name: 'Notlarım', path: '/notes' },
     { name: 'Analizler', path: '/analytics' },
     { name: 'Sıralama', path: '/leaderboard' },
   ];
@@ -21,8 +22,8 @@ export default function Navbar() {
 
   return (
     <>
-    <nav className="sticky top-0 z-50 w-full px-4 py-4 sm:px-6 lg:px-8">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between rounded-[32px] bg-white/70 px-6 tracking-wide shadow-clay-card backdrop-blur-xl sm:h-20 sm:rounded-[40px] sm:px-8">
+    <nav className="sticky top-0 z-50 w-full bg-clay-canvas px-4 py-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between rounded-[32px] bg-white/80 px-6 tracking-wide shadow-clay-card backdrop-blur-xl sm:h-20 sm:rounded-[40px] sm:px-8">
         <div className="flex items-center gap-3">
           {/* Hamburger Menu (Mobile Only) */}
           <button 
