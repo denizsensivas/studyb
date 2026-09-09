@@ -49,7 +49,9 @@ export default function SubjectAutocomplete({ value, onChange, error }: Props) {
         const res = await subjectAPI.search(text);
         setResults(res.data);
         setIsOpen(true);
-      } catch (e) {}
+      } catch {
+        // Keep the current suggestions if the search request fails.
+      }
     } else {
       setResults([]);
       setIsOpen(text.length > 0);

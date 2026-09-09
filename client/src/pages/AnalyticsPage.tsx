@@ -15,7 +15,72 @@ const SUBJECT_COLORS = [
   '#6366F1', // Indigo
 ];
 
-function SubjectPieChart({ stats }: { stats: any[] }) {
+interface SummaryStats {
+  correct: number;
+  wrong: number;
+  total: number;
+  entries: number;
+  pomodoroCount: number;
+  studyMinutes: number;
+}
+
+interface SubjectStat {
+  subjectId: string;
+  subjectName: string;
+  correct: number;
+  wrong: number;
+  total: number;
+  accuracy: number;
+}
+
+interface PomodoroStat {
+  subjectId: string | null;
+  subjectName: string;
+  totalMinutes: number;
+  sessionCount: number;
+}
+
+interface DailyStat {
+  date: string;
+  correct: number;
+  wrong: number;
+  total: number;
+}
+
+interface DashboardStats {
+  streak: number;
+  totalQuestions: number;
+  today: SummaryStats;
+  week: SummaryStats;
+  allTime: SummaryStats;
+  subjectStats: SubjectStat[];
+  pomodoroStats: PomodoroStat[];
+  examStats: {
+    avgTimePerQuestion: number;
+    totalQuestionsTimed: number;
+  };
+  dailyStats: DailyStat[];
+}
+
+interface PieSegment {
+  index: number;
+  name: string;
+  percent: number;
+  color: string;
+  strokeDasharray: string;
+  strokeDashoffset: number;
+}
+
+const EMPTY_SUMMARY: SummaryStats = {
+  correct: 0,
+  wrong: 0,
+  total: 0,
+  entries: 0,
+  pomodoroCount: 0,
+  studyMinutes: 0,
+};
+
+function SubjectPieChart({ stats = [] }: { stats?: PomodoroStat[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   if (!stats || stats.length === 0) return null;
@@ -23,27 +88,31 @@ function SubjectPieChart({ stats }: { stats: any[] }) {
   const total = stats.reduce((acc, s) => acc + (s.totalMinutes || 0), 0);
   if (total === 0) return null;
 
-  // Process data for SVG
-  let cumulativeValue = 0;
-  const segments = stats.map((s, i) => {
+  // Process data for SVG without mutating values during render.
+  const { segments } = stats.reduce<{ segments: PieSegment[]; cumulativeValue: number }>((acc, s, i) => {
     const value = s.totalMinutes || 0;
     const percent = (value / total) * 100;
-    const startValue = cumulativeValue;
-    cumulativeValue += value;
+    const startValue = acc.cumulativeValue;
     
     // SVG Circle properties
     const strokeDasharray = `${percent} ${100 - percent}`;
     const strokeDashoffset = - (startValue / total) * 100 + 25; // +25 to start from top
     
     return {
-      index: i,
-      name: s.subjectName,
-      percent,
-      color: SUBJECT_COLORS[i % SUBJECT_COLORS.length],
-      strokeDasharray,
-      strokeDashoffset,
+      cumulativeValue: startValue + value,
+      segments: [
+        ...acc.segments,
+        {
+          index: i,
+          name: s.subjectName,
+          percent,
+          color: SUBJECT_COLORS[i % SUBJECT_COLORS.length],
+          strokeDasharray,
+          strokeDashoffset,
+        },
+      ],
     };
-  });
+  }, { segments: [], cumulativeValue: 0 });
 
   return (
     <div className="relative flex flex-col items-center gap-10 lg:flex-row lg:items-center lg:justify-between w-full">
@@ -116,13 +185,13 @@ function SubjectPieChart({ stats }: { stats: any[] }) {
 }
 
 export default function AnalyticsPage() {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'week' | 'allTime'>('week');
 
   useEffect(() => {
     analyticsAPI.getDashboard()
-      .then((res) => setStats(res.data))
+      .then((res) => setStats(res.data as DashboardStats))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -135,9 +204,10 @@ export default function AnalyticsPage() {
     );
   }
 
-  const currentStats = stats?.[timeRange] || {};
+  const currentStats = stats?.[timeRange] ?? EMPTY_SUMMARY;
+  const averageQuestionTime = stats?.examStats.avgTimePerQuestion ?? 0;
   const maxTotal = stats?.dailyStats?.length 
-    ? Math.max(...stats.dailyStats.map((d: any) => d.total || 0), 10) 
+    ? Math.max(...stats.dailyStats.map((d) => d.total || 0), 10)
     : 10;
 
   return (
@@ -215,7 +285,7 @@ export default function AnalyticsPage() {
               {stats?.dailyStats?.length === 0 ? (
                 <div className="absolute inset-0 flex items-center justify-center text-clay-muted font-medium italic">Geçen hafta hiç soru çözülmedi.</div>
               ) : (
-                stats?.dailyStats?.map((day: any) => {
+                stats?.dailyStats?.map((day) => {
                   const heightPercentage = Math.max((day.total / maxTotal) * 100, 5);
                   const correctRatio = day.total > 0 ? (day.correct / day.total) * 100 : 0;
                   
@@ -265,18 +335,18 @@ export default function AnalyticsPage() {
               <div className="rounded-2xl bg-white p-6 shadow-clay-card">
                 <p className="text-sm font-bold text-clay-muted mb-1">Soru Başına Ortalama Süre</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-black text-clay-accent">{stats?.examStats?.avgTimePerQuestion || 0}</span>
+                  <span className="text-4xl font-black text-clay-accent">{averageQuestionTime}</span>
                   <span className="text-lg font-bold text-clay-muted">saniye</span>
                 </div>
                 <div className="mt-4 h-2 w-full bg-clay-canvas rounded-full overflow-hidden shadow-clay-pressed">
                   <div 
                     className="h-full bg-clay-accent transition-all duration-1000" 
-                    style={{ width: `${Math.min((stats?.examStats?.avgTimePerQuestion / 120) * 100, 100)}%` }}
+                    style={{ width: `${Math.min((averageQuestionTime / 120) * 100, 100)}%` }}
                   />
                 </div>
                 <p className="mt-3 text-[11px] font-bold text-clay-muted leading-relaxed">
-                  {stats?.examStats?.avgTimePerQuestion < 45 ? "Süper hız! Soruları çok seri çözüyorsun." : 
-                   stats?.examStats?.avgTimePerQuestion < 90 ? "İdeal tempodasınız. Odaklanmaya devam et." : 
+                  {averageQuestionTime < 45 ? "Süper hız! Soruları çok seri çözüyorsun." :
+                   averageQuestionTime < 90 ? "İdeal tempodasınız. Odaklanmaya devam et." :
                    "Hızını artırmak için biraz daha pratik yapmalısın."}
                 </p>
               </div>
@@ -320,7 +390,7 @@ export default function AnalyticsPage() {
                   Henüz odaklanma verisi kaydedilmedi.
                 </div>
               ) : (
-                stats?.pomodoroStats?.map((stat: any, i: number) => {
+                stats?.pomodoroStats?.map((stat, i) => {
                   const totalMinutes = stat.totalMinutes || 0;
                   const percentage = stats.allTime.studyMinutes > 0 
                     ? Math.round((totalMinutes / stats.allTime.studyMinutes) * 100) 
@@ -363,7 +433,7 @@ export default function AnalyticsPage() {
                 Henüz ders bazlı veri girilmedi.
               </div>
             ) : (
-              stats?.subjectStats?.map((subject: any) => (
+              stats?.subjectStats?.map((subject) => (
                 <div key={subject.subjectId} className="group relative overflow-hidden rounded-[24px] bg-clay-canvas p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-clay-card hover:bg-white">
                   <div className="flex items-center justify-between mb-4">
                     <span className="font-black text-clay-foreground truncate max-w-[150px]">{subject.subjectName}</span>

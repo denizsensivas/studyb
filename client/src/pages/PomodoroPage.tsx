@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Layout from '../design-system/Layout';
 import Card from '../design-system/Card';
 import Button from '../design-system/Button';
@@ -17,7 +17,7 @@ export default function PomodoroPage() {
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | undefined>();
 
   const { user, updatePreferences } = useAuth();
-  const prefs = user?.preferences || {};
+  const prefs = useMemo(() => user?.preferences ?? {}, [user?.preferences]);
 
   // Settings
   const [autoStartBreaks, setAutoStartBreaks] = useState<boolean>(prefs.autoStartBreaks ?? false);
@@ -32,6 +32,10 @@ export default function PomodoroPage() {
     return s ? JSON.parse(s) : [];
   });
   const [newTask, setNewTask] = useState('');
+  const timerActionsRef = useRef<{
+    start: () => void;
+    setMode: (mode: 'pomodoro' | 'shortBreak' | 'longBreak') => void;
+  } | null>(null);
 
   useEffect(() => localStorage.setItem('studyb_tasks', JSON.stringify(tasks)), [tasks]);
 
@@ -52,7 +56,7 @@ export default function PomodoroPage() {
             return prev;
           });
         }
-      } catch (err) { setError('Oturum kaydedilemedi.'); }
+      } catch { setError('Oturum kaydedilemedi.'); }
 
       // Determine if next is short or long break based on current session count
       nextMode = ((completedToday + 1) % longBreakInterval === 0) ? 'longBreak' : 'shortBreak';
@@ -61,12 +65,12 @@ export default function PomodoroPage() {
       nextMode = 'pomodoro';
     }
 
-    setMode(nextMode);
+    timerActionsRef.current?.setMode(nextMode);
 
     if (nextMode === 'shortBreak' || nextMode === 'longBreak') {
-      if (autoStartBreaks) setTimeout(start, 50);
+      if (autoStartBreaks) setTimeout(() => timerActionsRef.current?.start(), 50);
     } else {
-      if (autoStartPomodoros) setTimeout(start, 50);
+      if (autoStartPomodoros) setTimeout(() => timerActionsRef.current?.start(), 50);
     }
   };
 
@@ -74,13 +78,18 @@ export default function PomodoroPage() {
     timeLeft, isRunning, mode, start, pause, reset, setMode, customDurations, setAllCustomDurations, skip
   } = useTimer(handleComplete);
 
+  useEffect(() => {
+    timerActionsRef.current = { start, setMode };
+  }, [start, setMode]);
+
   // Initialize custom durations from preferences
   useEffect(() => {
     if (prefs.customDurations) {
       setAllCustomDurations(prefs.customDurations);
     }
+  }, [prefs.customDurations, setAllCustomDurations]);
 
-    // Fetch today's session count
+  useEffect(() => {
     const fetchStats = async () => {
       try {
         const { data } = await pomodoroAPI.getStats();
@@ -90,7 +99,6 @@ export default function PomodoroPage() {
       }
     };
     fetchStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save changes to database (debounced)

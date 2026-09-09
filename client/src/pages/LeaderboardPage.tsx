@@ -9,23 +9,61 @@ const LEVEL_LABELS: Record<string, string> = {
   UNIVERSITY: 'Üniversite',
 };
 
+type LeaderboardFilter = 'GLOBAL' | 'PRIMARY_SCHOOL' | 'HIGH_SCHOOL' | 'UNIVERSITY';
+type LeaderboardSort = 'questions' | 'streak' | 'studyTime';
+
+interface LeaderboardUser {
+  id: string;
+  name: string;
+  educationLevel: Exclude<LeaderboardFilter, 'GLOBAL'>;
+  totalQuestions: number;
+  totalStudyMinutes: number;
+  streak: number;
+}
+
+const FILTER_TABS: { id: LeaderboardFilter; label: string }[] = [
+  { id: 'GLOBAL', label: 'Genel' },
+  { id: 'PRIMARY_SCHOOL', label: 'İlkokul / Ortaokul' },
+  { id: 'HIGH_SCHOOL', label: 'Lise' },
+  { id: 'UNIVERSITY', label: 'Üniversite' },
+];
+
+const SORT_OPTIONS: { id: LeaderboardSort; label: string }[] = [
+  { id: 'questions', label: 'Soru Sayısı' },
+  { id: 'streak', label: 'Günlük Seri' },
+  { id: 'studyTime', label: 'Çalışma Süresi' },
+];
+
 export default function LeaderboardPage() {
-  const [filter, setFilter] = useState<'GLOBAL' | 'PRIMARY_SCHOOL' | 'HIGH_SCHOOL' | 'UNIVERSITY'>('GLOBAL');
-  const [sortBy, setSortBy] = useState<'questions' | 'streak' | 'studyTime'>('questions');
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<LeaderboardFilter>('GLOBAL');
+  const [sortBy, setSortBy] = useState<LeaderboardSort>('questions');
+  const requestKey = `${filter}:${sortBy}`;
+  const [result, setResult] = useState<{ key: string | null; users: LeaderboardUser[] }>({
+    key: null,
+    users: [],
+  });
+  const loading = result.key !== requestKey;
+  const users = result.users;
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     const fetchAPI = filter === 'GLOBAL' 
       ? leaderboardAPI.getGlobal(sortBy) 
       : leaderboardAPI.getByLevel(filter, sortBy);
 
-    fetchAPI
-      .then((res) => setUsers(res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [filter, sortBy]);
+    void fetchAPI.then(
+      (res) => {
+        if (!cancelled) setResult({ key: requestKey, users: res.data as LeaderboardUser[] });
+      },
+      () => {
+        if (!cancelled) setResult({ key: requestKey, users: [] });
+      },
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filter, requestKey, sortBy]);
 
   const formatStudyTime = (minutes: number) => {
     const h = Math.floor(minutes / 60);
@@ -47,15 +85,10 @@ export default function LeaderboardPage() {
         <div className="flex flex-col gap-6 items-center">
           {/* Level Filters */}
           <div className="flex flex-wrap justify-center gap-3 rounded-full bg-clay-canvas p-2 shadow-clay-pressed w-fit">
-              {[
-                { id: 'GLOBAL', label: 'Genel' },
-                { id: 'PRIMARY_SCHOOL', label: 'İlkokul / Ortaokul' },
-                { id: 'HIGH_SCHOOL', label: 'Lise' },
-                { id: 'UNIVERSITY', label: 'Üniversite' },
-              ].map((tab) => (
+              {FILTER_TABS.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setFilter(tab.id as any)}
+                  onClick={() => setFilter(tab.id)}
                   className={`rounded-full px-5 py-2 text-sm font-bold transition-all duration-300 ${
                     filter === tab.id
                       ? 'bg-white text-clay-accent shadow-clay-card'
@@ -71,14 +104,10 @@ export default function LeaderboardPage() {
           {/* Sort Selection */}
           <div className="flex flex-wrap justify-center gap-2 px-4 py-2 bg-slate-100/50 rounded-2xl border border-slate-200/50">
             <span className="text-xs font-black text-clay-muted uppercase tracking-widest mr-2 self-center">Sırala:</span>
-            {[
-              { id: 'questions', label: 'Soru Sayısı' },
-              { id: 'streak', label: 'Günlük Seri' },
-              { id: 'studyTime', label: 'Çalışma Süresi' },
-            ].map((sort) => (
+            {SORT_OPTIONS.map((sort) => (
               <button
                 key={sort.id}
-                onClick={() => setSortBy(sort.id as any)}
+                onClick={() => setSortBy(sort.id)}
                 className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${
                   sortBy === sort.id 
                     ? 'bg-clay-accent text-white shadow-clay-button transform scale-105' 

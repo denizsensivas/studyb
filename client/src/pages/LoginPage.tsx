@@ -5,6 +5,7 @@ import Layout from '../design-system/Layout';
 import Card from '../design-system/Card';
 import Input from '../design-system/Input';
 import Button from '../design-system/Button';
+import { getApiErrorMessage } from '../services/api';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -22,8 +23,8 @@ export default function LoginPage() {
     try {
       await login(email, password);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.'));
     } finally {
       setIsLoading(false);
     }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Layout from '../design-system/Layout';
 import Card from '../design-system/Card';
 import Button from '../design-system/Button';
@@ -29,6 +29,30 @@ export default function ExamTimerPage() {
   
   const timerRef = useRef<number | null>(null);
 
+  const handleFinish = useCallback(async () => {
+    setIsActive(false);
+    setIsFinished(true);
+    setLoading(true);
+
+    // Save current question before finishing
+    const finalQuestions = [
+      ...questions,
+      { questionNo: currentQuestion, timeSpent: currentQuestionTime }
+    ];
+    setQuestions(finalQuestions);
+
+    try {
+      await examAPI.create({
+        totalDuration: parseInt(totalMinutes),
+        questions: finalQuestions,
+      });
+    } catch {
+      setError('Sınav verisi kaydedilemedi.');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentQuestion, currentQuestionTime, questions, totalMinutes]);
+
   // Main tick
   useEffect(() => {
     if (isActive && timeLeft > 0) {
@@ -42,7 +66,7 @@ export default function ExamTimerPage() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isActive, timeLeft]);
+  }, [handleFinish, isActive, timeLeft]);
 
   const handleStart = () => {
     const mins = parseInt(totalMinutes);
@@ -63,30 +87,6 @@ export default function ExamTimerPage() {
     ]);
     setCurrentQuestion((prev) => prev + 1);
     setCurrentQuestionTime(0); // Reset for next target
-  };
-
-  const handleFinish = async () => {
-    setIsActive(false);
-    setIsFinished(true);
-    setLoading(true);
-
-    // Save current question before finishing
-    const finalQuestions = [
-      ...questions,
-      { questionNo: currentQuestion, timeSpent: currentQuestionTime }
-    ];
-    setQuestions(finalQuestions);
-
-    try {
-      await examAPI.create({
-        totalDuration: parseInt(totalMinutes),
-        questions: finalQuestions,
-      });
-    } catch (err: any) {
-      setError('Sınav verisi kaydedilemedi.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const formatTime = (seconds: number) => {

@@ -4,7 +4,7 @@ import Card from '../design-system/Card';
 import Input from '../design-system/Input';
 import Button from '../design-system/Button';
 import SubjectAutocomplete from '../components/SubjectAutocomplete';
-import { dailyEntryAPI } from '../services/api';
+import { dailyEntryAPI, getApiErrorMessage } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
 export default function DailyTrackingPage() {
@@ -54,8 +54,8 @@ export default function DailyTrackingPage() {
       setSubjectId(undefined);
       setCorrect('');
       setWrong('');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Kayıt sırasında bir hata oluştu.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Kayıt sırasında bir hata oluştu.'));
     } finally {
       setLoading(false);
     }

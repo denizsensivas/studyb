@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './hooks/useAuth';
+import { AuthProvider } from './hooks/AuthProvider';
 import { PrivateRoute } from './components/PrivateRoute';
 import Navbar from './components/Navbar';
 import ScrollToTop from './components/ScrollToTop';

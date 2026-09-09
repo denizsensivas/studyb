@@ -5,9 +5,11 @@ import Layout from '../design-system/Layout';
 import Card from '../design-system/Card';
 import Input from '../design-system/Input';
 import Button from '../design-system/Button';
+import { getApiErrorMessage } from '../services/api';
+import type { RegisterInput } from '../hooks/authTypes';
 
 export default function RegisterPage() {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<RegisterInput>({
     name: '',
     email: '',
     password: '',
@@ -32,15 +34,16 @@ export default function RegisterPage() {
     try {
       await register(formData);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Kayıt başarısız. Lütfen tekrar deneyin.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Kayıt başarısız. Lütfen tekrar deneyin.'));
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData((current) => ({ ...current, [name]: value }));
   };
 
   return (

@@ -7,14 +7,29 @@ import Button from '../design-system/Button';
 import { useAuth } from '../hooks/useAuth';
 import { analyticsAPI } from '../services/api';
 
+interface DashboardStats {
+  streak: number;
+  totalQuestions: number;
+  today: {
+    studyMinutes: number;
+    total: number;
+    correct: number;
+  };
+  week: {
+    total: number;
+    correct: number;
+    pomodoroCount: number;
+  };
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     analyticsAPI.getDashboard()
-      .then((res) => setStats(res.data))
+      .then((res) => setStats(res.data as DashboardStats))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -39,12 +54,12 @@ export default function DashboardPage() {
             <p className="mt-2 text-lg font-medium text-clay-muted">Bugün harika şeyler başarmaya hazır mısın?</p>
           </div>
           <div className="hidden sm:block">
-            {stats?.streak > 0 && (
+            {(stats?.streak ?? 0) > 0 && (
               <div className="flex items-center gap-3 rounded-full bg-orange-50 px-6 py-3 shadow-clay-card border-2 border-orange-200">
                 <span className="text-3xl">🔥</span>
                 <div className="flex flex-col">
                   <span className="text-xl font-black text-orange-600" style={{ fontFamily: 'Nunito, sans-serif' }}>
-                    {stats.streak} Gün
+                    {stats?.streak ?? 0} Gün
                   </span>
                   <span className="text-xs font-bold uppercase tracking-wide text-orange-500">Seri Devam Ediyor</span>
                 </div>
@@ -139,8 +154,8 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between rounded-2xl bg-clay-canvas px-4 py-3 sm:px-5 sm:py-4 shadow-clay-pressed">
                   <span className="font-bold text-clay-muted">Doğru Oranı</span>
                   <span className="text-xl font-black text-clay-success pr-1" style={{ fontFamily: 'Nunito, sans-serif' }}>
-                    {stats?.week?.total > 0 
-                      ? Math.round((stats.week.correct / stats.week.total) * 100) 
+                    {(stats?.week?.total ?? 0) > 0
+                      ? Math.round(((stats?.week?.correct ?? 0) / (stats?.week?.total ?? 1)) * 100)
                       : 0}%
                   </span>
                 </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface UseTimerResult {
   timeLeft: number;
@@ -20,18 +20,55 @@ const DURATIONS = {
   longBreak: 15 * 60,
 };
 
+function getInitialTimerState(): {
+  mode: 'pomodoro' | 'shortBreak' | 'longBreak';
+  timeLeft: number;
+  customDurations: { pomodoro: number; shortBreak: number; longBreak: number };
+  consumedSeconds: number;
+} {
+  const fallback = {
+    mode: 'pomodoro' as const,
+    timeLeft: DURATIONS.pomodoro,
+    customDurations: { ...DURATIONS },
+    consumedSeconds: 0,
+  };
+
+  const saved = localStorage.getItem('studyb_timer');
+  if (!saved) return fallback;
+
+  try {
+    const parsed = JSON.parse(saved);
+    return parsed.timeLeft > 0
+      ? {
+          mode: parsed.mode,
+          timeLeft: parsed.timeLeft,
+          customDurations: parsed.customDurations,
+          consumedSeconds: parsed.consumedSeconds || 0,
+        }
+      : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function useTimer(onComplete?: (mode: string, durationMinutes: number, consumedMinutes: number) => void): UseTimerResult {
-  const [mode, setMode] = useState<'pomodoro' | 'shortBreak' | 'longBreak'>('pomodoro');
-  const [timeLeft, setTimeLeft] = useState(DURATIONS.pomodoro);
+  const [initialState] = useState(getInitialTimerState);
+  const [mode, setMode] = useState<'pomodoro' | 'shortBreak' | 'longBreak'>(initialState.mode);
+  const [timeLeft, setTimeLeft] = useState(initialState.timeLeft);
   const [isRunning, setIsRunning] = useState(false);
-  const [customDurations, setCustomDurations] = useState({ ...DURATIONS });
-  const [consumedSeconds, setConsumedSeconds] = useState(0);
+  const [customDurations, setCustomDurations] = useState(initialState.customDurations);
+  const [consumedSeconds, setConsumedSeconds] = useState(initialState.consumedSeconds);
   
   const timerRef = useRef<number | null>(null);
   const skipRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const lastTickRef = useRef<number>(Date.now());
+  const lastTickRef = useRef(0);
   const workerRef = useRef<Worker | null>(null);
+  const onCompleteRef = useRef(onComplete);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   useEffect(() => {
     // Setup Web Worker for unthrottled background tick
@@ -51,22 +88,6 @@ export function useTimer(onComplete?: (mode: string, durationMinutes: number, co
     const blob = new Blob([workerCode], { type: 'application/javascript' });
     workerRef.current = new Worker(URL.createObjectURL(blob));
 
-    // Load persisted state if any
-    const saved = localStorage.getItem('studyb_timer');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.timeLeft > 0) {
-          setMode(parsed.mode);
-          setTimeLeft(parsed.timeLeft);
-          setCustomDurations(parsed.customDurations);
-          setConsumedSeconds(parsed.consumedSeconds || 0);
-        }
-      } catch (e) {
-        // ignore parsing errors
-      }
-    }
-
     return () => {
       workerRef.current?.terminate();
     };
@@ -80,7 +101,7 @@ export function useTimer(onComplete?: (mode: string, durationMinutes: number, co
       workerRef.current.onmessage = () => {
         const now = Date.now();
         const deltaSeconds = Math.floor((now - lastTickRef.current) / 1000);
-        
+
         if (deltaSeconds > 0) {
           lastTickRef.current += deltaSeconds * 1000;
           setTimeLeft((prev) => {
@@ -110,37 +131,43 @@ export function useTimer(onComplete?: (mode: string, durationMinutes: number, co
     );
 
     if (timeLeft === 0 && isRunning) {
-      setIsRunning(false);
-      if (timerRef.current) clearInterval(timerRef.current);
-      
-      const wasSkipped = skipRef.current;
-      skipRef.current = false;
+      const completionTimeout = window.setTimeout(() => {
+        setIsRunning(false);
+        if (timerRef.current) clearInterval(timerRef.current);
 
-      // Play sound only if not skipped
-      if (!wasSkipped) {
-        if (audioRef.current) {
-          audioRef.current.currentTime = 0;
-          audioRef.current.play().catch(e => console.error("Audio play failed:", e));
-        } else {
-          try {
-            const audio = new Audio('/api/audio/alarm');
-            audio.play().catch(e => console.error("Audio play failed fallback:", e));
-          } catch (e) {}
+        const wasSkipped = skipRef.current;
+        skipRef.current = false;
+
+        // Play sound only if not skipped
+        if (!wasSkipped) {
+          if (audioRef.current) {
+            audioRef.current.currentTime = 0;
+            audioRef.current.play().catch(e => console.error("Audio play failed:", e));
+          } else {
+            try {
+              const audio = new Audio('/api/audio/alarm');
+              audio.play().catch(e => console.error("Audio play failed fallback:", e));
+            } catch {
+              // Audio is optional and may be unavailable in the current browser.
+            }
+          }
         }
-      }
 
-      // Call completion handler
-      if (onComplete) {
-        const durationMinutes = Math.round(customDurations[mode] / 60);
-        const consumedMinutes = Math.max(1, Math.round(consumedSeconds / 60)); // Min 1 min if session was active
-        const actualConsumed = consumedSeconds > 0 ? consumedMinutes : 0;
-        onComplete(mode, durationMinutes, actualConsumed);
-      }
-      setConsumedSeconds(0);
+        // Call completion handler
+        if (onCompleteRef.current) {
+          const durationMinutes = Math.round(customDurations[mode] / 60);
+          const consumedMinutes = Math.max(1, Math.round(consumedSeconds / 60)); // Min 1 min if session was active
+          const actualConsumed = consumedSeconds > 0 ? consumedMinutes : 0;
+          onCompleteRef.current(mode, durationMinutes, actualConsumed);
+        }
+        setConsumedSeconds(0);
+      }, 0);
+
+      return () => clearTimeout(completionTimeout);
     }
-  }, [isRunning, timeLeft, mode, customDurations, onComplete, consumedSeconds]);
+  }, [isRunning, timeLeft, mode, customDurations, consumedSeconds]);
 
-  const initAudioUnlock = () => {
+  const initAudioUnlock = useCallback(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio('/api/audio/alarm');
     }
@@ -156,49 +183,48 @@ export function useTimer(onComplete?: (mode: string, durationMinutes: number, co
         // Expected if already playing or no interaction yet
       });
     }
-  };
+  }, []);
 
-  const start = () => {
+  const start = useCallback(() => {
     initAudioUnlock();
     setIsRunning(true);
-  };
+  }, [initAudioUnlock]);
 
-  const pause = () => setIsRunning(false);
+  const pause = useCallback(() => setIsRunning(false), []);
   
-  const reset = () => {
+  const reset = useCallback(() => {
     setIsRunning(false);
     setTimeLeft(customDurations[mode]);
     setConsumedSeconds(0);
-  };
+  }, [customDurations, mode]);
 
-  const changeMode = (newMode: 'pomodoro' | 'shortBreak' | 'longBreak') => {
+  const changeMode = useCallback((newMode: 'pomodoro' | 'shortBreak' | 'longBreak') => {
     setIsRunning(false);
     setMode(newMode);
     setTimeLeft(customDurations[newMode]);
     setConsumedSeconds(0);
-  };
+  }, [customDurations]);
 
-  const setCustomDuration = (minutes: number) => {
+  const setCustomDuration = useCallback((minutes: number) => {
     const seconds = minutes * 60;
-    const newDurations = { ...customDurations, [mode]: seconds };
-    setCustomDurations(newDurations);
+    setCustomDurations((durations) => ({ ...durations, [mode]: seconds }));
     if (!isRunning) {
       setTimeLeft(seconds);
     }
-  };
+  }, [isRunning, mode]);
 
-  const setAllCustomDurations = (d: { pomodoro: number, shortBreak: number, longBreak: number }) => {
+  const setAllCustomDurations = useCallback((d: { pomodoro: number, shortBreak: number, longBreak: number }) => {
     setCustomDurations(d);
     if (!isRunning) {
       setTimeLeft(d[mode]);
     }
-  };
+  }, [isRunning, mode]);
 
-  const skip = () => {
+  const skip = useCallback(() => {
     skipRef.current = true;
     setTimeLeft(0);
     if (!isRunning) setIsRunning(true); // force trigger completion inside useEffect
-  };
+  }, [isRunning]);
 
 
   return {

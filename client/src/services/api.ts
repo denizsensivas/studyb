@@ -1,4 +1,18 @@
 import axios from 'axios';
+import type { AuthResponse, LoginInput, RegisterInput, User, UserPreferences } from '../hooks/authTypes';
+
+interface ApiErrorResponse {
+  error?: string;
+}
+
+interface DailyEntryResponse {
+  todayTotal: number;
+}
+
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (!axios.isAxiosError<ApiErrorResponse>(error)) return fallback;
+  return error.response?.data?.error || fallback;
+}
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -19,8 +33,8 @@ api.interceptors.request.use((config) => {
 // Handle 401 responses globally
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
+  (error: unknown) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
       localStorage.removeItem('studyb_token');
       localStorage.removeItem('studyb_user');
       window.location.href = '/login';
@@ -31,14 +45,14 @@ api.interceptors.response.use(
 
 // ── Auth ──
 export const authAPI = {
-  register: (data: { name: string; email: string; password: string; educationLevel: string }) =>
-    api.post('/auth/register', data),
-  login: (data: { email: string; password: string }) =>
-    api.post('/auth/login', data),
+  register: (data: RegisterInput) =>
+    api.post<AuthResponse>('/auth/register', data),
+  login: (data: LoginInput) =>
+    api.post<AuthResponse>('/auth/login', data),
   getProfile: () =>
-    api.get('/auth/profile'),
-  updatePreferences: (preferences: any) =>
-    api.patch('/auth/preferences', { preferences }),
+    api.get<User>('/auth/profile'),
+  updatePreferences: (preferences: UserPreferences) =>
+    api.patch<User>('/auth/preferences', { preferences }),
 };
 
 // ── Subjects ──
@@ -51,7 +65,7 @@ export const subjectAPI = {
 // ── Daily Entry ──
 export const dailyEntryAPI = {
   create: (data: { subjectId?: string; subjectName?: string; correct: number; wrong: number }) =>
-    api.post('/daily-entry', data),
+    api.post<DailyEntryResponse>('/daily-entry', data),
   getAll: () => api.get('/daily-entry'),
   getToday: () => api.get('/daily-entry/today'),
 };
