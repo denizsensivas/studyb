@@ -6,8 +6,6 @@ Last synchronized: 2026-09-09
 
 ## Open issues
 
-- [ ] [#2 — Soru Sayısı Sıralama](https://github.com/denizsensivas/studyb/issues/2)
-  - Sıralamalar sekmesinde soru sayısı kaldırılsın.
 - [ ] [#3 — mail doğrulama](https://github.com/denizsensivas/studyb/issues/3)
   - Mail doğrulama ile hesap açma gereksin. Mail doğrulanmadan servislerden cevap dönmesin.
 - [ ] [#4 — konu dağılımı grafiği](https://github.com/denizsensivas/studyb/issues/4)
@@ -23,6 +21,10 @@ Last synchronized: 2026-09-09
 
 ## Completed locally
 
+- [x] [#2 — Soru Sayısı Sıralama](https://github.com/denizsensivas/studyb/issues/2)
+  - Sıralamalar sekmesinde soru sayısı kaldırılsın.
+  - Removed the question-count sort and table column; daily streak is now the default ranking.
+  - Verified in the browser on mobile and desktop layouts.
 - [x] [#1 — Scroll sorunu](https://github.com/denizsensivas/studyb/issues/1)
   - Farklı başlıklara geçince ekran en baştan başlasın.
   - Implemented with a centralized route-change scroll reset.
