@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { PrivateRoute } from './components/PrivateRoute';
 import Navbar from './components/Navbar';
+import ScrollToTop from './components/ScrollToTop';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 
@@ -15,6 +16,7 @@ import LeaderboardPage from './pages/LeaderboardPage';
 export default function App() {
   return (
     <AuthProvider>
+      <ScrollToTop />
       <Navbar />
       <Routes>
         {/* Public Routes */}
