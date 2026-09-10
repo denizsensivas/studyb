@@ -67,8 +67,28 @@ interface PieSegment {
   name: string;
   percent: number;
   color: string;
-  strokeDasharray: string;
-  strokeDashoffset: number;
+  path: string;
+}
+
+const PIE_CENTER = 21;
+const PIE_RADIUS = 15.9155;
+
+function pointOnPie(angleDegrees: number) {
+  const angleRadians = ((angleDegrees - 90) * Math.PI) / 180;
+  return {
+    x: PIE_CENTER + PIE_RADIUS * Math.cos(angleRadians),
+    y: PIE_CENTER + PIE_RADIUS * Math.sin(angleRadians),
+  };
+}
+
+function createPieArc(startPercent: number, endPercent: number) {
+  const startAngle = startPercent * 3.6;
+  const sweepAngle = Math.min((endPercent - startPercent) * 3.6, 359.999);
+  const start = pointOnPie(startAngle);
+  const end = pointOnPie(startAngle + sweepAngle);
+  const largeArcFlag = sweepAngle > 180 ? 1 : 0;
+
+  return `M ${start.x} ${start.y} A ${PIE_RADIUS} ${PIE_RADIUS} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
 }
 
 const EMPTY_SUMMARY: SummaryStats = {
@@ -82,6 +102,7 @@ const EMPTY_SUMMARY: SummaryStats = {
 
 function SubjectPieChart({ stats = [] }: { stats?: PomodoroStat[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   if (!stats || stats.length === 0) return null;
 
@@ -93,10 +114,8 @@ function SubjectPieChart({ stats = [] }: { stats?: PomodoroStat[] }) {
     const value = s.totalMinutes || 0;
     const percent = (value / total) * 100;
     const startValue = acc.cumulativeValue;
-    
-    // SVG Circle properties
-    const strokeDasharray = `${percent} ${100 - percent}`;
-    const strokeDashoffset = - (startValue / total) * 100 + 25; // +25 to start from top
+    const startPercent = (startValue / total) * 100;
+    const endPercent = ((startValue + value) / total) * 100;
     
     return {
       cumulativeValue: startValue + value,
@@ -107,33 +126,42 @@ function SubjectPieChart({ stats = [] }: { stats?: PomodoroStat[] }) {
           name: s.subjectName,
           percent,
           color: SUBJECT_COLORS[i % SUBJECT_COLORS.length],
-          strokeDasharray,
-          strokeDashoffset,
+          path: createPieArc(startPercent, endPercent),
         },
       ],
     };
   }, { segments: [], cumulativeValue: 0 });
+  const highlightedIndex = hoveredIndex ?? selectedIndex;
+
+  const toggleSelection = (index: number) => {
+    setSelectedIndex((current) => current === index ? null : index);
+  };
 
   return (
     <div className="relative flex flex-col items-center gap-10 lg:flex-row lg:items-center lg:justify-between w-full">
       {/* Legend */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-1 w-full lg:w-48 order-2 lg:order-1">
         {segments.map((s) => (
-          <div 
+          <button
+            type="button"
             key={s.name} 
-            className={`flex items-center gap-3 group cursor-pointer transition-all duration-200 ${hoveredIndex !== null && hoveredIndex !== s.index ? 'opacity-40 grayscale-[0.5]' : 'opacity-100'}`}
+            aria-pressed={selectedIndex === s.index}
+            className={`flex items-center gap-3 rounded-2xl text-left group cursor-pointer transition-[opacity,filter,color] duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-clay-accent/20 ${highlightedIndex !== null && highlightedIndex !== s.index ? 'opacity-40 grayscale-[0.5]' : 'opacity-100'}`}
+            onClick={() => toggleSelection(s.index)}
             onMouseEnter={() => setHoveredIndex(s.index)}
             onMouseLeave={() => setHoveredIndex(null)}
+            onFocus={() => setHoveredIndex(s.index)}
+            onBlur={() => setHoveredIndex(null)}
           >
             <div 
               className="h-3.5 w-3.5 rounded-full shadow-sm transition-transform group-hover:scale-125" 
               style={{ backgroundColor: s.color }} 
             />
             <div className="flex flex-col min-w-0">
-              <span className={`text-[12px] font-black tracking-tight truncate leading-none mb-1 transition-colors ${hoveredIndex === s.index ? 'text-clay-accent' : 'text-clay-foreground'}`}>{s.name}</span>
+              <span className={`text-[12px] font-black tracking-tight truncate leading-none mb-1 transition-colors ${highlightedIndex === s.index ? 'text-clay-accent' : 'text-clay-foreground'}`}>{s.name}</span>
               <span className="text-[10px] font-extrabold text-clay-muted">%{Math.round(s.percent)}</span>
             </div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -142,39 +170,74 @@ function SubjectPieChart({ stats = [] }: { stats?: PomodoroStat[] }) {
         {/* Soft Background Shadow Ring */}
         <div className="absolute inset-2 rounded-full bg-clay-canvas shadow-clay-pressed" />
 
-        <svg viewBox="0 0 42 42" className="h-full w-full -rotate-90 relative top-0 left-0 transform transition-transform duration-500 hover:rotate-0">
-          {segments.map((s) => (
-            <circle
-              key={s.name}
-              cx="21"
-              cy="21"
-              r="15.9155"
-              fill="transparent"
-              stroke={s.color}
-              strokeWidth={hoveredIndex === s.index ? "5" : "4.5"}
-              strokeDasharray={s.strokeDasharray}
-              strokeDashoffset={s.strokeDashoffset}
-              className="transition-all duration-500 ease-out cursor-pointer"
-              style={{ 
-                filter: hoveredIndex === s.index ? `drop-shadow(0 0 6px ${s.color}66)` : 'none',
-                opacity: hoveredIndex !== null && hoveredIndex !== s.index ? 0.3 : 1,
-                transform: hoveredIndex === s.index ? 'scale(1.04)' : 'scale(1)',
-                transformOrigin: 'center'
-              }}
-              onMouseEnter={() => setHoveredIndex(s.index)}
-              onMouseLeave={() => setHoveredIndex(null)}
-            />
+              <svg viewBox="0 0 42 42" className="h-full w-full relative top-0 left-0">
+                <defs>
+                  <filter
+                    id="pie-segment-glow"
+                    x="-12"
+                    y="-12"
+                    width="66"
+                    height="66"
+                    filterUnits="userSpaceOnUse"
+                    colorInterpolationFilters="sRGB"
+                  >
+                    <feGaussianBlur stdDeviation="0.9" />
+                  </filter>
+                </defs>
+                {segments.map((s) => (
+                  <g key={s.name}>
+                    {highlightedIndex === s.index && (
+                      <path
+                        d={s.path}
+                        fill="none"
+                        stroke={s.color}
+                        strokeWidth="7"
+                        strokeLinecap="butt"
+                        opacity="0.48"
+                        filter="url(#pie-segment-glow)"
+                        pointerEvents="none"
+                        aria-hidden="true"
+                      />
+              )}
+              <path
+                d={s.path}
+                fill="transparent"
+                stroke={s.color}
+                strokeWidth={highlightedIndex === s.index ? "5" : "4.5"}
+                strokeLinecap="butt"
+                pointerEvents="visibleStroke"
+                className="cursor-pointer outline-none transition-[stroke-width,opacity] duration-200 ease-out"
+                role="button"
+                tabIndex={0}
+                aria-label={`${s.name}: %${Math.round(s.percent)}`}
+                aria-pressed={selectedIndex === s.index}
+                style={{
+                  opacity: highlightedIndex !== null && highlightedIndex !== s.index ? 0.3 : 1,
+                }}
+                onClick={() => toggleSelection(s.index)}
+                onMouseEnter={() => setHoveredIndex(s.index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                onFocus={() => setHoveredIndex(s.index)}
+                onBlur={() => setHoveredIndex(null)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    toggleSelection(s.index);
+                  }
+                }}
+              />
+            </g>
           ))}
         </svg>
 
         {/* Center Hole / Content */}
         <div className="absolute inset-16 sm:inset-20 rounded-full bg-white shadow-clay-card flex flex-col items-center justify-center text-center p-4 z-10 select-none backdrop-blur-sm bg-white/90">
           <span className="text-[10px] font-black text-clay-muted uppercase tracking-widest leading-none mb-1">
-            {hoveredIndex !== null ? segments[hoveredIndex].name : "Toplam"}
+            {highlightedIndex !== null ? segments[highlightedIndex].name : "Toplam"}
           </span>
           <span className="text-xl font-black text-clay-foreground leading-none">
-            {hoveredIndex !== null 
-              ? `${Math.floor((stats[hoveredIndex].totalMinutes || 0) / 60)}s ${stats[hoveredIndex].totalMinutes % 60}d`
+            {highlightedIndex !== null
+              ? `${Math.floor((stats[highlightedIndex].totalMinutes || 0) / 60)}s ${stats[highlightedIndex].totalMinutes % 60}d`
               : `${Math.floor(total / 60)}s ${total % 60}d`
             }
           </span>
