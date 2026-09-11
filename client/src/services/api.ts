@@ -88,6 +88,7 @@ export const leaderboardAPI = {
 // ── Documents ──
 export const documentAPI = {
   getAll: () => api.get('/documents'),
+  getStorageUsage: () => api.get('/documents/storage'),
   upload: (file: File, title?: string) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -111,4 +112,3 @@ export const studySessionAPI = {
 };
 
 export default api;
-

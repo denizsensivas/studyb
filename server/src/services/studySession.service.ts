@@ -20,6 +20,15 @@ export class StudySessionService {
       throw new Error('Konu ID veya konu adı gerekli');
     }
 
+    const ownedSubject = await prisma.subject.findFirst({
+      where: { id: subjectId, userId: data.userId },
+      select: { id: true },
+    });
+
+    if (!ownedSubject) {
+      throw new Error('Konu bulunamadı veya bu kullanıcıya ait değil');
+    }
+
     const session = await prisma.studySession.create({
       data: {
         userId: data.userId,

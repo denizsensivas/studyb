@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import Layout from '../design-system/Layout';
 import Card from '../design-system/Card';
 import Input from '../design-system/Input';
@@ -9,6 +10,13 @@ import { useAuth } from '../hooks/useAuth';
 
 type TabType = 'questions' | 'study';
 
+function trackingErrorMessage(error: unknown) {
+  if (axios.isAxiosError<{ error?: string }>(error)) {
+    return error.response?.data?.error || 'Kayıt sırasında bir hata oluştu.';
+  }
+  return 'Kayıt sırasında bir hata oluştu.';
+}
+
 export default function DailyTrackingPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('questions');
@@ -18,8 +26,6 @@ export default function DailyTrackingPage() {
   const [subjectId, setSubjectId] = useState<string | undefined>();
   const [correct, setCorrect] = useState('');
   const [wrong, setWrong] = useState('');
-  const [lastSavedTotal, setLastSavedTotal] = useState(0);
-  const [todayTotal, setTodayTotal] = useState(0);
 
   // Study session form state
   const [studySubjectName, setStudySubjectName] = useState('');
@@ -27,7 +33,6 @@ export default function DailyTrackingPage() {
   const [studyHours, setStudyHours] = useState('');
   const [studyMinutes, setStudyMinutes] = useState('');
   const [studyNotes, setStudyNotes] = useState('');
-  const [todayStudyMinutes, setTodayStudyMinutes] = useState(0);
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -61,16 +66,14 @@ export default function DailyTrackingPage() {
         wrong: parseInt(wrong) || 0,
       });
       
-      setLastSavedTotal((parseInt(correct) || 0) + (parseInt(wrong) || 0));
-      setTodayTotal(res.data.todayTotal || 0);
       setSuccessMessage(`✅ Başarıyla kaydedildi! Yeni girdiğin ${(parseInt(correct) || 0) + (parseInt(wrong) || 0)} soru eklendi. Bugün toplam ${res.data.todayTotal || 0} soru çözdün.`);
       setSuccess(true);
       setSubjectName('');
       setSubjectId(undefined);
       setCorrect('');
       setWrong('');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Kayıt sırasında bir hata oluştu.');
+    } catch (error: unknown) {
+      setError(trackingErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -94,14 +97,13 @@ export default function DailyTrackingPage() {
     setSuccess(false);
 
     try {
-      const res = await studySessionAPI.create({
+      await studySessionAPI.create({
         subjectName: studySubjectId ? undefined : studySubjectName,
         subjectId: studySubjectId,
         duration: totalMinutes,
         notes: studyNotes || undefined,
       });
       
-      setTodayStudyMinutes(res.data.todayTotalMinutes || 0);
       const hrs = Math.floor(totalMinutes / 60);
       const mins = totalMinutes % 60;
       const timeStr = hrs > 0 ? `${hrs} saat ${mins} dakika` : `${mins} dakika`;
@@ -112,8 +114,8 @@ export default function DailyTrackingPage() {
       setStudyHours('');
       setStudyMinutes('');
       setStudyNotes('');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Kayıt sırasında bir hata oluştu.');
+    } catch (error: unknown) {
+      setError(trackingErrorMessage(error));
     } finally {
       setLoading(false);
     }

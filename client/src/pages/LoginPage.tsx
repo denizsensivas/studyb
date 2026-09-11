@@ -1,10 +1,18 @@
 import { useState } from 'react';
+import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import Layout from '../design-system/Layout';
 import Card from '../design-system/Card';
 import Input from '../design-system/Input';
 import Button from '../design-system/Button';
+
+function authErrorMessage(error: unknown, fallback: string) {
+  if (axios.isAxiosError<{ error?: string }>(error)) {
+    return error.response?.data?.error || fallback;
+  }
+  return fallback;
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -22,8 +30,8 @@ export default function LoginPage() {
     try {
       await login(email, password);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
+    } catch (error: unknown) {
+      setError(authErrorMessage(error, 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.'));
     } finally {
       setIsLoading(false);
     }
@@ -36,8 +44,8 @@ export default function LoginPage() {
     try {
       await testLogin();
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Test moduna giriş yapılamadı.');
+    } catch (error: unknown) {
+      setError(authErrorMessage(error, 'Test moduna giriş yapılamadı.'));
     } finally {
       setIsLoading(false);
     }
@@ -88,15 +96,17 @@ export default function LoginPage() {
               {isLoading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
             </Button>
 
-            <Button
-              type="button"
-              variant="outline"
-              fullWidth
-              disabled={isLoading}
-              onClick={handleTestLogin}
-            >
-              🚀 Test Modu ile Giriş Yap
-            </Button>
+            {import.meta.env.DEV && (
+              <Button
+                type="button"
+                variant="outline"
+                fullWidth
+                disabled={isLoading}
+                onClick={handleTestLogin}
+              >
+                🚀 Test Modu ile Giriş Yap
+              </Button>
+            )}
 
             <p className="text-center text-sm font-bold text-clay-muted">
               Hesabın yok mu?{' '}

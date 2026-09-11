@@ -57,6 +57,10 @@ export class AuthService {
   }
 
   async testLogin() {
+    if (env.NODE_ENV !== 'development') {
+      throw new Error('Test girişi yalnızca geliştirme ortamında kullanılabilir');
+    }
+
     const testEmail = 'testuser@studyb.com';
     let user = await prisma.user.findUnique({ where: { email: testEmail } });
     if (!user) {

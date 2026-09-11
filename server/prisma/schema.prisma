@@ -97,7 +97,7 @@ model Document {
   fileName    String
   fileSize    Int
   mimeType    String
-  filePath    String
+  storageKey  String   @map("filePath")
   createdAt   DateTime @default(now())
 
   user        User     @relation(fields: [userId], references: [id])

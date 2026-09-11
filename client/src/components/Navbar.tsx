@@ -11,7 +11,7 @@ export default function Navbar() {
   const navLinks = [
     { name: 'Ana Sayfa', path: '/' },
     { name: 'Pomodoro', path: '/pomodoro' },
-    { name: 'Soru Gir', path: '/tracking' },
+    { name: 'Çalışma Takibi', path: '/tracking' },
     { name: 'Sınav', path: '/exam' },
     { name: 'Notlarım', path: '/notes' },
     { name: 'Analizler', path: '/analytics' },

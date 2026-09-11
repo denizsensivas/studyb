@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 import Layout from '../design-system/Layout';
 import Card from '../design-system/Card';
 import Button from '../design-system/Button';
@@ -14,8 +15,44 @@ interface StudyDocument {
   createdAt: string;
 }
 
+interface StorageUsage {
+  usedBytes: number;
+  limitBytes: number;
+  remainingBytes: number;
+  usagePercent: number;
+}
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const ALLOWED_FILE_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'text/plain',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/epub+zip',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+]);
+
+function uploadErrorMessage(error: unknown) {
+  if (axios.isAxiosError<{ error?: string }>(error)) {
+    return error.response?.data?.error || 'Dosya yüklenirken bir hata oluştu.';
+  }
+  return 'Dosya yüklenirken bir hata oluştu.';
+}
+
+function formatStorageBytes(bytes: number) {
+  if (bytes >= 1_000_000_000) return `${parseFloat((bytes / 1_000_000_000).toFixed(2))} GB`;
+  if (bytes >= 1_000_000) return `${parseFloat((bytes / 1_000_000).toFixed(2))} MB`;
+  if (bytes >= 1_000) return `${parseFloat((bytes / 1_000).toFixed(2))} KB`;
+  return `${bytes} Bytes`;
+}
+
 export default function NotesPage() {
   const [documents, setDocuments] = useState<StudyDocument[]>([]);
+  const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [fileTitle, setFileTitle] = useState('');
@@ -31,24 +68,47 @@ export default function NotesPage() {
 
   const fetchDocuments = async () => {
     try {
-      const res = await documentAPI.getAll();
-      setDocuments(res.data);
-    } catch (err: any) {
+      const [documentsResponse, storageResponse] = await Promise.all([
+        documentAPI.getAll(),
+        documentAPI.getStorageUsage(),
+      ]);
+      setDocuments(documentsResponse.data);
+      setStorageUsage(storageResponse.data);
+    } catch {
       setError('Dosyalar yüklenirken bir hata oluştu.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      setSelectedFile(file);
-      setError('');
-      if (!fileTitle) {
-        setFileTitle(file.name.replace(/\.[^/.]+$/, ""));
-      }
+  const selectFile = (file: File) => {
+    if (file.size > MAX_FILE_SIZE) {
+      setSelectedFile(null);
+      setError('Dosya boyutu 10 MB sınırını aşamaz.');
+      return;
     }
+
+    if (!ALLOWED_FILE_TYPES.has(file.type)) {
+      setSelectedFile(null);
+      setError('Bu dosya türü desteklenmiyor.');
+      return;
+    }
+
+    if (storageUsage && file.size > storageUsage.remainingBytes) {
+      setSelectedFile(null);
+      setError('Paylaşılan bulut alanında bu dosya için yeterli yer yok.');
+      return;
+    }
+
+    setSelectedFile(file);
+    setError('');
+    if (!fileTitle) {
+      setFileTitle(file.name.replace(/\.[^/.]+$/, ''));
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) selectFile(e.target.files[0]);
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -65,14 +125,7 @@ export default function NotesPage() {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      setSelectedFile(file);
-      setError('');
-      if (!fileTitle) {
-        setFileTitle(file.name.replace(/\.[^/.]+$/, ""));
-      }
-    }
+    if (e.dataTransfer.files?.[0]) selectFile(e.dataTransfer.files[0]);
   };
 
   const handleUpload = async (e: React.FormEvent) => {
@@ -88,13 +141,23 @@ export default function NotesPage() {
 
     try {
       const res = await documentAPI.upload(selectedFile, fileTitle);
-      setDocuments([res.data, ...documents]);
+      setDocuments((currentDocuments) => [res.data, ...currentDocuments]);
+      setStorageUsage((currentUsage) => {
+        if (!currentUsage) return currentUsage;
+        const usedBytes = currentUsage.usedBytes + res.data.fileSize;
+        return {
+          ...currentUsage,
+          usedBytes,
+          remainingBytes: Math.max(0, currentUsage.limitBytes - usedBytes),
+          usagePercent: Math.min(100, Number(((usedBytes / currentUsage.limitBytes) * 100).toFixed(2))),
+        };
+      });
       setSelectedFile(null);
       setFileTitle('');
-      setSuccess('Dosyanız başarıyla yüklendi.');
+      setSuccess('Dosyanız güvenli bulut alanına yüklendi.');
       if (fileInputRef.current) fileInputRef.current.value = '';
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Dosya yüklenirken bir hata oluştu.');
+    } catch (error: unknown) {
+      setError(uploadErrorMessage(error));
     } finally {
       setUploading(false);
     }
@@ -104,10 +167,23 @@ export default function NotesPage() {
     if (!window.confirm('Bu dosyayı silmek istediğinize emin misiniz?')) return;
 
     try {
+      const deletedDocument = documents.find((doc) => doc.id === id);
       await documentAPI.delete(id);
-      setDocuments(documents.filter((doc) => doc.id !== id));
+      setDocuments((currentDocuments) => currentDocuments.filter((doc) => doc.id !== id));
+      if (deletedDocument) {
+        setStorageUsage((currentUsage) => {
+          if (!currentUsage) return currentUsage;
+          const usedBytes = Math.max(0, currentUsage.usedBytes - deletedDocument.fileSize);
+          return {
+            ...currentUsage,
+            usedBytes,
+            remainingBytes: currentUsage.limitBytes - usedBytes,
+            usagePercent: Number(((usedBytes / currentUsage.limitBytes) * 100).toFixed(2)),
+          };
+        });
+      }
       setSuccess('Dosya silindi.');
-    } catch (err) {
+    } catch {
       setError('Dosya silinirken bir hata oluştu.');
     }
   };
@@ -115,8 +191,14 @@ export default function NotesPage() {
   const handleAction = async (doc: StudyDocument, actionType: 'view' | 'download') => {
     setError('');
     setSuccess('');
+    const previewWindow = actionType === 'view' ? window.open('', '_blank') : null;
+
+    if (actionType === 'view' && !previewWindow) {
+      setError('Tarayıcınız yeni sekme açılmasını engelledi. Lütfen izin verin.');
+      return;
+    }
+
     try {
-      console.log(`Action: ${actionType} for file: ${doc.id}`);
       const res = await documentAPI.download(doc.id);
       
       if (!res.data) {
@@ -127,10 +209,8 @@ export default function NotesPage() {
       const url = window.URL.createObjectURL(blob);
       
       if (actionType === 'view') {
-        const newTab = window.open(url, '_blank');
-        if (!newTab) {
-          setError('Tarayıcınız yeni sekme açılmasını engelledi. Lütfen izin verin.');
-        }
+        previewWindow!.location.href = url;
+        setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
       } else {
         const link = document.createElement('a');
         link.href = url;
@@ -140,8 +220,8 @@ export default function NotesPage() {
         link.parentNode?.removeChild(link);
         setTimeout(() => window.URL.revokeObjectURL(url), 100);
       }
-    } catch (err: any) {
-      console.error('Document action error:', err);
+    } catch {
+      previewWindow?.close();
       setError('Dosya açılırken/indirilirken bir hata oluştu.');
     }
   };
@@ -194,6 +274,44 @@ export default function NotesPage() {
               <h2 className="mb-4 text-xl font-extrabold text-clay-foreground" style={{ fontFamily: 'Nunito, sans-serif' }}>
                 Dosya Yükle
               </h2>
+              <div className="mb-5 rounded-[20px] bg-clay-canvas p-4 shadow-clay-pressed" aria-live="polite">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-extrabold text-clay-foreground">Paylaşılan Bulut Alanı</p>
+                    <p className="mt-0.5 text-xs font-semibold text-clay-muted">Tüm kullanıcılar için ortak limit</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-white/70 px-2.5 py-1 text-xs font-extrabold text-clay-accent shadow-sm">
+                    9 GB
+                  </span>
+                </div>
+                {storageUsage ? (
+                  <>
+                    <div
+                      className="mt-3 h-3 overflow-hidden rounded-full bg-white/70 shadow-inner"
+                      role="progressbar"
+                      aria-label="Paylaşılan bulut depolama kullanımı"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={storageUsage.usagePercent}
+                    >
+                      <div
+                        className={`h-full rounded-full transition-[width] duration-500 ${
+                          storageUsage.usagePercent >= 90
+                            ? 'bg-gradient-to-r from-orange-400 to-red-500'
+                            : 'bg-gradient-to-r from-clay-accent to-purple-500'
+                        }`}
+                        style={{ width: `${storageUsage.usagePercent}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 flex justify-between gap-3 text-xs font-bold text-clay-muted">
+                      <span>{formatStorageBytes(storageUsage.usedBytes)} kullanılıyor</span>
+                      <span>{formatStorageBytes(storageUsage.remainingBytes)} boş</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-3 text-xs font-bold text-clay-muted">Alan bilgisi yükleniyor…</p>
+                )}
+              </div>
               <form onSubmit={handleUpload} className="space-y-4">
                 <div 
                   onDragEnter={handleDrag}
@@ -214,6 +332,7 @@ export default function NotesPage() {
                     type="file"
                     ref={fileInputRef}
                     onChange={handleFileChange}
+                    accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx,.epub,.ppt,.pptx"
                     className="hidden"
                     id="file-upload-input"
                   />
@@ -225,6 +344,9 @@ export default function NotesPage() {
                   >
                     Dosya Seç
                   </Button>
+                  <span className="mt-3 text-xs font-bold leading-relaxed text-clay-muted">
+                    PDF, görsel, metin, Word, EPUB veya PowerPoint • En fazla 10 MB
+                  </span>
                 </div>
 
                 <Input
@@ -240,7 +362,7 @@ export default function NotesPage() {
                   fullWidth
                   disabled={uploading || !selectedFile}
                 >
-                  {uploading ? 'Yükleniyor...' : 'Sisteme Yükle'}
+                  {uploading ? 'Buluta yükleniyor...' : 'Buluta Yükle'}
                 </Button>
               </form>
             </Card>
