@@ -1,5 +1,6 @@
 import prisma from '../prisma/client';
 import { subjectService } from './subject.service';
+import { activityService } from './activity.service';
 
 export class DailyEntryService {
   async create(data: {
@@ -35,8 +36,12 @@ export class DailyEntryService {
       include: { subject: true },
     });
 
-    // Update streak and totalQuestions
-    await this.updateStreak(data.userId, totalNew);
+    // Update streak for any question entry and increment the question total.
+    await activityService.record(data.userId);
+    await prisma.user.update({
+      where: { id: data.userId },
+      data: { totalQuestions: { increment: totalNew } },
+    });
 
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
@@ -84,43 +89,6 @@ export class DailyEntryService {
     });
   }
 
-  private async updateStreak(userId: string, newQuestions: number) {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    let newStreak = user.streak;
-
-    if (user.lastActiveDate) {
-      const lastActive = new Date(user.lastActiveDate);
-      lastActive.setHours(0, 0, 0, 0);
-
-      const diffDays = Math.floor((today.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24));
-
-      if (diffDays === 1) {
-        // Consecutive day -> increment streak
-        newStreak += 1;
-      } else if (diffDays > 1) {
-        // Missed day(s) -> reset streak
-        newStreak = 1;
-      }
-      // diffDays === 0 means same day, streak stays the same
-    } else {
-      // First entry ever
-      newStreak = 1;
-    }
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        streak: newStreak,
-        lastActiveDate: new Date(),
-        totalQuestions: { increment: newQuestions },
-      },
-    });
-  }
 }
 
 export const dailyEntryService = new DailyEntryService();

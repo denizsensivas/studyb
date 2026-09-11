@@ -1,11 +1,12 @@
 import prisma from '../prisma/client';
+import { activityService } from './activity.service';
 
 export class ExamService {
   async create(userId: string, data: {
     totalDuration: number;
     questions: { questionNo: number; timeSpent: number }[];
   }) {
-    return prisma.examSession.create({
+    const session = await prisma.examSession.create({
       data: {
         userId,
         totalDuration: data.totalDuration,
@@ -18,6 +19,9 @@ export class ExamService {
       },
       include: { questions: { orderBy: { questionNo: 'asc' } } },
     });
+
+    await activityService.record(userId);
+    return session;
   }
 
   async getByUser(userId: string, limit = 20) {

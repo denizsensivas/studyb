@@ -12,8 +12,6 @@ Last synchronized: 2026-09-09
   - Sitedeki bütün endpointler için throttler eklensin.
 - [ ] [#6 — redis implemente et](https://github.com/denizsensivas/studyb/issues/6)
   - Redis implemente et.
-- [ ] [#7 — streak](https://github.com/denizsensivas/studyb/issues/7)
-  - Streak sayısı artmıyor, sadece soru sayısı girince artıyor; düzelt.
 - [ ] [#8 — uploading documents](https://github.com/denizsensivas/studyb/issues/8)
   - Dosya yükleme işi olsun, yapay zeka ile not özeti vb.
 
@@ -32,3 +30,5 @@ Last synchronized: 2026-09-09
   - Farklı başlıklara geçince ekran en baştan başlasın.
   - Implemented with a centralized route-change scroll reset.
   - Verified in the browser on mobile and desktop layouts, including the real PostgreSQL-backed API.
+- [x] [#7 — streak](https://github.com/denizsensivas/studyb/issues/7)
+  - Streak artık soru girişi, tamamlanan Pomodoro ve sınav oturumu gibi tüm çalışma aktivitelerinde güncelleniyor.

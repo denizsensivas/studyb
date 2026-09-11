@@ -1,5 +1,6 @@
 import prisma from '../prisma/client';
 import { subjectService } from './subject.service';
+import { activityService } from './activity.service';
 
 export class PomodoroService {
   async create(userId: string, duration: number, subjectId?: string, subjectName?: string) {
@@ -26,6 +27,8 @@ export class PomodoroService {
         totalStudyMinutes: { increment: duration } 
       } as any,
     });
+
+    await activityService.record(userId);
 
     return session;
   }
