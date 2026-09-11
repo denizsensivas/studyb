@@ -4,6 +4,7 @@ import { authController } from '../controllers/auth.controller';
 import { authMiddleware } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { env } from '../config/env';
+import { authRateLimit } from '../middleware/rateLimit';
 
 const router = Router();
 
@@ -19,10 +20,10 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Şifre gerekli'),
 });
 
-router.post('/register', validate(registerSchema), (req, res) => authController.register(req, res));
-router.post('/login', validate(loginSchema), (req, res) => authController.login(req, res));
+router.post('/register', authRateLimit, validate(registerSchema), (req, res) => authController.register(req, res));
+router.post('/login', authRateLimit, validate(loginSchema), (req, res) => authController.login(req, res));
 if (env.NODE_ENV === 'development') {
-  router.post('/test-login', (req, res) => authController.testLogin(req, res));
+  router.post('/test-login', authRateLimit, (req, res) => authController.testLogin(req, res));
 }
 router.get('/profile', authMiddleware, (req, res) => authController.getProfile(req, res));
 router.patch('/preferences', authMiddleware, (req, res) => authController.updatePreferences(req, res));

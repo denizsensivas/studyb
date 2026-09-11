@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { EducationLevel } from '@prisma/client';
 import prisma from '../prisma/client';
 import { env } from '../config/env';
+import { invalidateLeaderboards } from '../redis/cache';
 
 export class AuthService {
   async register(data: {
@@ -37,6 +38,7 @@ export class AuthService {
     });
 
     const token = this.generateToken(user.id);
+    await invalidateLeaderboards();
     return { user, token };
   }
 

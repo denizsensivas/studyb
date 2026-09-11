@@ -1,5 +1,6 @@
 import prisma from '../prisma/client';
 import { activityService } from './activity.service';
+import { invalidateUserStats } from '../redis/cache';
 
 export class ExamService {
   async create(userId: string, data: {
@@ -21,6 +22,7 @@ export class ExamService {
     });
 
     await activityService.record(userId);
+    await invalidateUserStats(userId);
     return session;
   }
 

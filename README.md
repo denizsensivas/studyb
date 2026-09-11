@@ -28,6 +28,19 @@ belge kayıtlarını temel alır; bucket yalnızca uygulama tarafından kullanı
 için R2 obje listesi her istekte tekrar taranmaz. PDF, JPG, PNG, WebP, TXT, DOC,
 DOCX, EPUB, PPT ve PPTX desteklenir.
 
+## Redis
+
+Redis; API ve kimlik doğrulama hız sınırlarını tüm uygulama örnekleri arasında
+paylaştırmak, pahalı analiz sorgularını kısa süreli önbelleğe almak ve liderlik
+tablosu sorgularını önbelleğe almak için kullanılır. Yazma işlemleri ilgili
+önbellekleri geçersiz kılar. Redis üretimde zorunludur; bağlantı kurulamazsa
+uygulama trafiğe açılmaz ve `/ready` 503 döndürür.
+
+Yerel geliştirme için `docker compose up -d` komutu PostgreSQL ile kalıcı AOF
+depolamalı Redis'i başlatır. Ardından `server/.env.example` dosyasını temel alarak
+`server/.env` oluşturun. Üretimde yönetilen Redis'in TLS bağlantı adresini
+(`rediss://...`) `REDIS_URL` olarak verin ve Redis portunu internete açmayın.
+
 ## Proje Yapısı
 
 ```

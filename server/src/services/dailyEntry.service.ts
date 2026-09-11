@@ -1,6 +1,7 @@
 import prisma from '../prisma/client';
 import { subjectService } from './subject.service';
 import { activityService } from './activity.service';
+import { invalidateUserStats } from '../redis/cache';
 
 export class DailyEntryService {
   async create(data: {
@@ -60,6 +61,8 @@ export class DailyEntryService {
     });
 
     const todayTotal = todayEntries.reduce((sum: number, e: { correct: number, wrong: number }) => sum + e.correct + e.wrong, 0);
+
+    await invalidateUserStats(data.userId);
 
     return { entry, todayTotal };
   }

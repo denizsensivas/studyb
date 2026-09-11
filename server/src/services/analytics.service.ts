@@ -1,7 +1,13 @@
 import prisma from '../prisma/client';
+import { getOrSetCache, getUserAnalyticsVersion } from '../redis/cache';
 
 export class AnalyticsService {
   async getDashboard(userId: string) {
+    const version = await getUserAnalyticsVersion(userId);
+    return getOrSetCache(`analytics:${userId}:${version}`, () => this.buildDashboard(userId));
+  }
+
+  private async buildDashboard(userId: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 

@@ -3,6 +3,9 @@ import cors from 'cors';
 import path from 'path';
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
+import prisma from './prisma/client';
+import { apiRateLimit } from './middleware/rateLimit';
+import { connectRedis, disconnectRedis, getRedisStatus, isRedisReady } from './redis/client';
 
 // Route imports
 import authRoutes from './routes/auth.routes';
@@ -17,9 +20,12 @@ import studySessionRoutes from './routes/studySession.routes';
 
 const app = express();
 
+if (env.TRUST_PROXY > 0) app.set('trust proxy', env.TRUST_PROXY);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/api', apiRateLimit);
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -35,6 +41,21 @@ app.use('/api/study-sessions', studySessionRoutes);
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Readiness is intentionally strict: traffic should only reach an instance when
+// both durable storage and the shared Redis dependency are available.
+app.get('/ready', async (_req, res) => {
+  const [database, redis] = await Promise.all([
+    prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false),
+    env.REDIS_URL ? isRedisReady() : Promise.resolve(env.NODE_ENV !== 'production'),
+  ]);
+  const ready = database && redis;
+  res.status(ready ? 200 : 503).json({
+    status: ready ? 'ready' : 'not_ready',
+    dependencies: { database, redis: env.REDIS_URL ? getRedisStatus() : 'disabled' },
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Serve custom alarm audio securely
@@ -72,9 +93,48 @@ if (process.env.NODE_ENV === 'production') {
 // Error handling
 app.use(errorHandler);
 
-// Start server
-app.listen(env.PORT, () => {
-  console.log(`🚀 Study Buddy API running on http://localhost:${env.PORT}`);
-});
+async function start(): Promise<void> {
+  await connectRedis();
+
+  const server = app.listen(env.PORT, () => {
+    console.log(`Study Buddy API listening on port ${env.PORT}`);
+  });
+
+  let shuttingDown = false;
+  const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.info('Graceful shutdown started', { signal });
+
+    const forceExit = setTimeout(() => {
+      console.error('Graceful shutdown timed out');
+      server.closeAllConnections();
+      process.exit(1);
+    }, 10_000);
+    forceExit.unref();
+
+    server.close(async (error) => {
+      try {
+        await Promise.allSettled([disconnectRedis(), prisma.$disconnect()]);
+        clearTimeout(forceExit);
+        process.exit(error ? 1 : 0);
+      } catch (shutdownError) {
+        console.error('Graceful shutdown failed', shutdownError);
+        process.exit(1);
+      }
+    });
+  };
+
+  process.once('SIGTERM', () => void shutdown('SIGTERM'));
+  process.once('SIGINT', () => void shutdown('SIGINT'));
+}
+
+if (require.main === module) {
+  start().catch(async (error) => {
+    console.error('Application startup failed', error);
+    await Promise.allSettled([disconnectRedis(), prisma.$disconnect()]);
+    process.exit(1);
+  });
+}
 
 export default app;

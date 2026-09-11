@@ -1,6 +1,7 @@
 import prisma from '../prisma/client';
 import { subjectService } from './subject.service';
 import { activityService } from './activity.service';
+import { invalidateUserStats } from '../redis/cache';
 
 export class PomodoroService {
   async create(userId: string, duration: number, subjectId?: string, subjectName?: string) {
@@ -29,6 +30,7 @@ export class PomodoroService {
     });
 
     await activityService.record(userId);
+    await invalidateUserStats(userId);
 
     return session;
   }

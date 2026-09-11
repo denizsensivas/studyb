@@ -2,7 +2,7 @@
 FROM node:22-alpine AS client-builder
 WORKDIR /app/client
 COPY client/package*.json ./
-RUN npm install
+RUN npm ci
 COPY client/ ./
 RUN npm run build
 
@@ -10,7 +10,7 @@ RUN npm run build
 FROM node:22-alpine AS server-builder
 WORKDIR /app/server
 COPY server/package*.json ./
-RUN npm install
+RUN npm ci
 COPY server/ ./
 RUN npx prisma generate && npm run build
 
@@ -23,7 +23,7 @@ COPY server/package*.json ./server/
 COPY server/prisma ./server/prisma/
 
 # Install ONLY production dependencies and generate prisma client
-RUN cd server && npm install --omit=dev && npx prisma generate
+RUN cd server && npm ci --omit=dev && npx prisma generate
 
 # Copy built assets from builder stages
 COPY --from=server-builder /app/server/dist ./server/dist

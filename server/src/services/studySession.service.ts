@@ -1,5 +1,6 @@
 import prisma from '../prisma/client';
 import { subjectService } from './subject.service';
+import { invalidateUserStats } from '../redis/cache';
 
 export class StudySessionService {
   async create(data: {
@@ -63,6 +64,8 @@ export class StudySessionService {
     });
 
     const todayTotalMinutes = todaySessions.reduce((sum, s) => sum + s.duration, 0);
+
+    await invalidateUserStats(data.userId);
 
     return { session, todayTotalMinutes };
   }

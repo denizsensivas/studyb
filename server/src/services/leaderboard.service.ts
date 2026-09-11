@@ -1,5 +1,6 @@
 import { EducationLevel } from '@prisma/client';
 import prisma from '../prisma/client';
+import { getLeaderboardVersion, getOrSetCache } from '../redis/cache';
 
 export class LeaderboardService {
   async getGlobal(sortBy: 'questions' | 'streak' | 'studyTime' = 'questions', limit = 50) {
@@ -8,7 +9,8 @@ export class LeaderboardService {
     else if (sortBy === 'studyTime') orderBy.totalStudyMinutes = 'desc';
     else orderBy.totalQuestions = 'desc';
 
-    return prisma.user.findMany({
+    const version = await getLeaderboardVersion();
+    return getOrSetCache(`leaderboard:${version}:global:${sortBy}:${limit}`, () => prisma.user.findMany({
       select: {
         id: true,
         name: true,
@@ -19,7 +21,7 @@ export class LeaderboardService {
       } as any,
       orderBy: [orderBy, { totalQuestions: 'desc' }],
       take: limit,
-    });
+    }), 30);
   }
 
   async getByLevel(level: EducationLevel, sortBy: 'questions' | 'streak' | 'studyTime' = 'questions', limit = 50) {
@@ -28,7 +30,8 @@ export class LeaderboardService {
     else if (sortBy === 'studyTime') orderBy.totalStudyMinutes = 'desc';
     else orderBy.totalQuestions = 'desc';
 
-    return prisma.user.findMany({
+    const version = await getLeaderboardVersion();
+    return getOrSetCache(`leaderboard:${version}:level:${level}:${sortBy}:${limit}`, () => prisma.user.findMany({
       where: { educationLevel: level },
       select: {
         id: true,
@@ -40,7 +43,7 @@ export class LeaderboardService {
       } as any,
       orderBy: [orderBy, { totalQuestions: 'desc' }],
       take: limit,
-    });
+    }), 30);
   }
 }
 
