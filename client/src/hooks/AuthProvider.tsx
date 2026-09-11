@@ -42,6 +42,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
   }, []);
 
+  const testLogin = useCallback(async () => {
+    const res = await authAPI.testLogin();
+    const { user: userData, token: newToken } = res.data;
+    localStorage.setItem('studyb_token', newToken);
+    localStorage.setItem('studyb_user', JSON.stringify(userData));
+    setToken(newToken);
+    setUser(userData);
+  }, []);
+
   const register = useCallback(async (data: RegisterInput) => {
     const res = await authAPI.register(data);
     const { user: userData, token: newToken } = res.data;
@@ -67,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, updatePreferences, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, testLogin, register, updatePreferences, logout }}>
       {children}
     </AuthContext.Provider>
   );

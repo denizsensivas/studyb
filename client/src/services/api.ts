@@ -49,6 +49,8 @@ export const authAPI = {
     api.post<AuthResponse>('/auth/register', data),
   login: (data: LoginInput) =>
     api.post<AuthResponse>('/auth/login', data),
+  testLogin: () =>
+    api.post<AuthResponse>('/auth/test-login'),
   getProfile: () =>
     api.get<User>('/auth/profile'),
   updatePreferences: (preferences: UserPreferences) =>
@@ -95,6 +97,32 @@ export const analyticsAPI = {
 export const leaderboardAPI = {
   getGlobal: (sortBy?: string) => api.get('/leaderboard/global', { params: { sortBy } }),
   getByLevel: (level: string, sortBy?: string) => api.get(`/leaderboard/level/${level}`, { params: { sortBy } }),
+};
+
+// ── Documents ──
+export const documentAPI = {
+  getAll: () => api.get('/documents'),
+  getStorageUsage: () => api.get('/documents/storage'),
+  upload: (file: File, title?: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (title) formData.append('title', title);
+    return api.post('/documents/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  download: (id: string) => api.get(`/documents/${id}/download`, { responseType: 'blob' }),
+  delete: (id: string) => api.delete(`/documents/${id}`),
+};
+
+// ── Study Sessions ──
+export const studySessionAPI = {
+  create: (data: { subjectId?: string; subjectName?: string; duration: number; notes?: string }) =>
+    api.post('/study-sessions', data),
+  getAll: () => api.get('/study-sessions'),
+  getToday: () => api.get('/study-sessions/today'),
 };
 
 export default api;

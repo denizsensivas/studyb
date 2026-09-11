@@ -13,8 +13,9 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
   const navLinks = [
     { name: 'Ana Sayfa', path: '/', icon: '🏠' },
     { name: 'Pomodoro', path: '/pomodoro', icon: '🍅' },
-    { name: 'Soru Gir', path: '/tracking', icon: '✏️' },
+    { name: 'Çalışma Takibi', path: '/tracking', icon: '✏️' },
     { name: 'Sınav', path: '/exam', icon: '📝' },
+    { name: 'Notlarım', path: '/notes', icon: '📂' },
     { name: 'Analizler', path: '/analytics', icon: '📊' },
     { name: 'Sıralama', path: '/leaderboard', icon: '🏆' },
   ];

@@ -20,12 +20,19 @@ export class AnalyticsService {
       subjectBreakdown,
       examStats,
       pomodoroBreakdown,
+      // Study session aggregates
+      todayStudySessions,
+      weekStudySessions,
+      allTimeStudySessions,
+      studySessionBreakdown,
+      recentStudySessions,
     ] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: {
           streak: true,
           totalQuestions: true,
+          totalStudyMinutes: true,
           lastActiveDate: true,
           educationLevel: true,
         },
@@ -82,6 +89,33 @@ export class AnalyticsService {
         _sum: { duration: true },
         _count: true,
       }) as any,
+      // Study session aggregates
+      prisma.studySession.aggregate({
+        where: { userId, date: { gte: today } },
+        _count: true,
+        _sum: { duration: true },
+      }),
+      prisma.studySession.aggregate({
+        where: { userId, date: { gte: weekAgo } },
+        _count: true,
+        _sum: { duration: true },
+      }),
+      prisma.studySession.aggregate({
+        where: { userId },
+        _count: true,
+        _sum: { duration: true },
+      }),
+      prisma.studySession.groupBy({
+        by: ['subjectId'],
+        where: { userId },
+        _sum: { duration: true },
+        _count: true,
+      }),
+      prisma.studySession.findMany({
+        where: { userId, date: { gte: weekAgo } },
+        include: { subject: true },
+        orderBy: { date: 'desc' },
+      }),
     ]);
 
 
@@ -89,7 +123,8 @@ export class AnalyticsService {
     // Fetch subject names for breakdown
     const subjectIds = [...new Set([
       ...subjectBreakdown.map((s: any) => s.subjectId),
-      ...pomodoroBreakdown.map((p: any) => p.subjectId).filter((id: any): id is string => id !== null)
+      ...pomodoroBreakdown.map((p: any) => p.subjectId).filter((id: any): id is string => id !== null),
+      ...studySessionBreakdown.map((s: any) => s.subjectId),
     ])];
 
 
@@ -124,9 +159,20 @@ export class AnalyticsService {
       };
     }).sort((a: any, b: any) => (b.totalMinutes || 0) - (a.totalMinutes || 0));
 
+    // Study session stats by subject
+    const studyStats = studySessionBreakdown.map((stat: any) => {
+      const subject = subjects.find((s: { id: string }) => s.id === stat.subjectId);
+      return {
+        subjectId: stat.subjectId,
+        subjectName: subject?.name || 'Bilinmeyen',
+        totalMinutes: stat._sum?.duration || 0,
+        sessionCount: stat._count,
+      };
+    }).sort((a: any, b: any) => (b.totalMinutes || 0) - (a.totalMinutes || 0));
+
 
     // Group entries by date for chart data
-    const dailyStats = this.groupByDate(recentEntries);
+    const dailyStats = this.groupByDate(recentEntries, recentStudySessions);
 
     return {
       streak: user?.streak || 0,
@@ -138,6 +184,8 @@ export class AnalyticsService {
         entries: todayEntries._count,
         pomodoroCount: todayPomodoros._count,
         studyMinutes: todayPomodoros._sum.duration || 0,
+        topicStudyMinutes: todayStudySessions._sum.duration || 0,
+        topicStudyCount: todayStudySessions._count,
       },
       week: {
         correct: weekEntries._sum.correct || 0,
@@ -146,6 +194,8 @@ export class AnalyticsService {
         entries: weekEntries._count,
         pomodoroCount: weekPomodoros._count,
         studyMinutes: weekPomodoros._sum.duration || 0,
+        topicStudyMinutes: weekStudySessions._sum.duration || 0,
+        topicStudyCount: weekStudySessions._count,
       },
       allTime: {
         correct: allTimeEntries._sum.correct || 0,
@@ -154,9 +204,12 @@ export class AnalyticsService {
         entries: allTimeEntries._count,
         pomodoroCount: allTimePomodoros._count,
         studyMinutes: allTimePomodoros._sum.duration || 0,
+        topicStudyMinutes: allTimeStudySessions._sum.duration || 0,
+        topicStudyCount: allTimeStudySessions._count,
       },
       subjectStats,
       pomodoroStats,
+      studyStats,
       examStats: {
         avgTimePerQuestion: Math.round(examStats._avg.timeSpent || 0),
         totalQuestionsTimed: examStats._count,
@@ -165,7 +218,7 @@ export class AnalyticsService {
     };
   }
 
-  private groupByDate(entries: any[]) {
+  private groupByDate(entries: any[], studySessions: any[]) {
     const dailyStats: any[] = [];
     const now = new Date();
     
@@ -179,6 +232,7 @@ export class AnalyticsService {
         correct: 0,
         wrong: 0,
         total: 0,
+        topicStudyMinutes: 0,
       });
     }
 
@@ -191,6 +245,16 @@ export class AnalyticsService {
         dayStat.correct += entry.correct;
         dayStat.wrong += entry.wrong;
         dayStat.total += entry.correct + entry.wrong;
+      }
+    }
+
+    for (const session of studySessions) {
+      const d = new Date(session.date);
+      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      
+      const dayStat = dailyStats.find(s => s.date === dateKey);
+      if (dayStat) {
+        dayStat.topicStudyMinutes += session.duration;
       }
     }
 

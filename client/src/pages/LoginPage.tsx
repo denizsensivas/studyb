@@ -12,7 +12,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, testLogin } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -23,8 +23,22 @@ export default function LoginPage() {
     try {
       await login(email, password);
       navigate('/');
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.'));
+    } catch (error: unknown) {
+      setError(getApiErrorMessage(error, 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTestLogin = async () => {
+    setError('');
+    setIsLoading(true);
+
+    try {
+      await testLogin();
+      navigate('/');
+    } catch (error: unknown) {
+      setError(getApiErrorMessage(error, 'Test moduna giriş yapılamadı.'));
     } finally {
       setIsLoading(false);
     }
@@ -74,6 +88,18 @@ export default function LoginPage() {
             <Button type="submit" fullWidth disabled={isLoading}>
               {isLoading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
             </Button>
+
+            {import.meta.env.DEV && (
+              <Button
+                type="button"
+                variant="outline"
+                fullWidth
+                disabled={isLoading}
+                onClick={handleTestLogin}
+              >
+                🚀 Test Modu ile Giriş Yap
+              </Button>
+            )}
 
             <p className="text-center text-sm font-bold text-clay-muted">
               Hesabın yok mu?{' '}

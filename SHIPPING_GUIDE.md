@@ -27,10 +27,14 @@ Uygulamayı senin için "Unified" (Birleşik) hale getirdim. Bu şu demek:
     -   Proje ekranında "Add" -> "Database" -> "Add PostgreSQL" seç.
 4.  **Uygulamayı Yapılandır (Variables)**:
     -   `studyb` servisine tıkla ve "Variables" sekmesine git.
-    -   "New Variable" tıkla ve şu iki değeri ekle:
+    -   "New Variable" tıkla ve şu değerleri ekle:
         -   `PORT`: `8080` (Benim hazırladığım Dockerfile bu portu kullanıyor)
         -   `JWT_SECRET`: Güçlü, rastgele bir şifre (Örn: `benim_cok_gizli_sifrem_123`)
         -   `DATABASE_URL`: `Add Reference` butonuna basıp listeden `Postgres` -> `DATABASE_URL` seç. (Railway bunu otomatik bağlar!)
+        -   `R2_ACCOUNT_ID`: Cloudflare hesap kimliği
+        -   `R2_ACCESS_KEY_ID`: R2 API token erişim anahtarı
+        -   `R2_SECRET_ACCESS_KEY`: R2 API token gizli anahtarı
+        -   `R2_BUCKET_NAME`: Özel R2 bucket adı (ör. `studyb-documents`)
 5.  **Canlıya Al (Deploy)**:
     -   Değişiklikleri kaydettiğinde Railway otomatik olarak `Dockerfile` dosyanı görecek ve uygulamayı derleyip yayına alacaktır.
 6.  **URL Al**:

@@ -12,6 +12,8 @@ import pomodoroRoutes from './routes/pomodoro.routes';
 import examRoutes from './routes/exam.routes';
 import analyticsRoutes from './routes/analytics.routes';
 import leaderboardRoutes from './routes/leaderboard.routes';
+import documentRoutes from './routes/document.routes';
+import studySessionRoutes from './routes/studySession.routes';
 
 const app = express();
 
@@ -27,6 +29,8 @@ app.use('/api/pomodoro', pomodoroRoutes);
 app.use('/api/exam', examRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/study-sessions', studySessionRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {
